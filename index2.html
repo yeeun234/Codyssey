@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Movie Tier List</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <style>
+    /* 이후 CSS 작성용 */
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="site-header">
+      <div class="header-left">
+        <h1 class="logo">Movie Tier</h1>
+        <p class="subtitle">Your personal movie ranking board</p>
+      </div>
+
+      <div class="header-right">
+        <button type="button" id="shareBtn" class="btn btn-secondary">Share</button>
+        <button type="button" id="loginBtn" class="btn btn-primary">Login</button>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main class="main-layout">
+      <!-- Hero / Landing -->
+      <section class="hero-section" id="heroSection">
+        <div class="hero-content">
+          <span class="hero-badge">Latest Popular Movies</span>
+          <h2 class="hero-title">Find your favorite movie tier</h2>
+          <p class="hero-desc">
+            로그인 후 장르를 선택하고, 별점을 매겨 나만의 영화 티어 리스트를 완성하세요.
+          </p>
+          <div class="hero-actions">
+            <button type="button" id="startBtn" class="btn btn-primary">Start Rating</button>
+            <button type="button" id="openGenresBtn" class="btn btn-secondary">Choose Genre</button>
+          </div>
+        </div>
+
+        <div class="hero-poster-area">
+          <!-- 최신 인기 영화 대표 배너 -->
+          <div class="hero-poster-card" id="heroPosterCard">
+            <img id="heroPosterImg" src="" alt="Featured movie poster" />
+            <div class="hero-poster-overlay">
+              <h3 id="heroPosterTitle">Featured Movie</h3>
+              <p id="heroPosterMeta">Avg Rating · Reviews</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Login Panel -->
+      <section class="panel-section" id="loginSection">
+        <div class="section-header">
+          <h2>Login</h2>
+          <p>가상 아이디 3개 중 하나를 선택하세요.</p>
+        </div>
+
+        <div class="login-list" id="loginList">
+          <!-- JS로 카드 생성 가능 -->
+          <button type="button" class="login-card" data-user-id="user1">
+            <strong>User 1</strong>
+            <span>Movie Lover</span>
+          </button>
+
+          <button type="button" class="login-card" data-user-id="user2">
+            <strong>User 2</strong>
+            <span>Genre Explorer</span>
+          </button>
+
+          <button type="button" class="login-card" data-user-id="user3">
+            <strong>User 3</strong>
+            <span>Review Collector</span>
+          </button>
+        </div>
+
+        <div class="login-status" id="loginStatus">
+          <p>현재 상태: 로그인 전</p>
+        </div>
+      </section>
+
+      <!-- Genre Selector -->
+      <section class="panel-section" id="genreSection">
+        <div class="section-header">
+          <h2>Choose Genre</h2>
+          <p>선호 장르를 선택하면 추천 영화가 바뀝니다.</p>
+        </div>
+
+        <div class="genre-list" id="genreList">
+          <button type="button" class="genre-btn" data-genre="action">Action</button>
+          <button type="button" class="genre-btn" data-genre="drama">Drama</button>
+          <button type="button" class="genre-btn" data-genre="thriller">Thriller</button>
+          <button type="button" class="genre-btn" data-genre="romance">Romance</button>
+          <button type="button" class="genre-btn" data-genre="animation">Animation</button>
+          <button type="button" class="genre-btn" data-genre="scifi">Sci-Fi</button>
+        </div>
+      </section>
+
+      <!-- Movie Grid -->
+      <section class="panel-section" id="movieSection">
+        <div class="section-header">
+          <h2>Popular Movies</h2>
+          <p>포스터를 클릭하면 상세 정보와 코멘트를 볼 수 있습니다.</p>
+        </div>
+
+        <div class="movie-grid" id="movieGrid">
+          <!-- const MOVIES 로 렌더링될 영역 -->
+          <!-- 카드 예시 구조:
+          <article class="movie-card" data-movie-id="1">
+            <div class="poster-wrap">
+              <img src="" alt="Movie title" />
+              <div class="hover-info">
+                <span>Reviews: 120</span>
+                <span>Avg: 4.2</span>
+              </div>
+            </div>
+            <div class="movie-info">
+              <h3>Movie Title</h3>
+              <p>Genre · Tier</p>
+            </div>
+          </article>
+          -->
+        </div>
+      </section>
+
+      <!-- Tier Board -->
+      <section class="panel-section" id="tierSection">
+        <div class="section-header">
+          <h2>Tier Board</h2>
+          <p>별점을 매기면 평균값에 따라 자동으로 이동합니다.</p>
+        </div>
+
+        <div class="tier-board" id="tierBoard">
+          <section class="tier-row tier-s" data-tier="S">
+            <div class="tier-label">
+              <h3>S Tier</h3>
+              <p>4.1 ~ 5.0</p>
+            </div>
+            <div class="tier-movie-list" id="tierSList"></div>
+          </section>
+
+          <section class="tier-row tier-a" data-tier="A">
+            <div class="tier-label">
+              <h3>A Tier</h3>
+              <p>3.1 ~ 4.0</p>
+            </div>
+            <div class="tier-movie-list" id="tierAList"></div>
+          </section>
+
+          <section class="tier-row tier-b" data-tier="B">
+            <div class="tier-label">
+              <h3>B Tier</h3>
+              <p>2.1 ~ 3.0</p>
+            </div>
+            <div class="tier-movie-list" id="tierBList"></div>
+          </section>
+
+          <section class="tier-row tier-c" data-tier="C">
+            <div class="tier-label">
+              <h3>C Tier</h3>
+              <p>0.0 ~ 2.0</p>
+            </div>
+            <div class="tier-movie-list" id="tierCList"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Movie Detail Modal -->
+  <div class="modal-backdrop" id="movieModalBackdrop" hidden>
+    <div class="modal" id="movieModal" role="dialog" aria-modal="true" aria-labelledby="movieModalTitle">
+      <button type="button" class="modal-close" id="movieModalClose">×</button>
+
+      <div class="modal-body">
+        <div class="modal-poster">
+          <img id="modalPosterImg" src="" alt="Selected movie poster" />
+        </div>
+
+        <div class="modal-content">
+          <h2 id="movieModalTitle">Movie Title</h2>
+          <p id="movieModalMeta">Genre · Avg Rating · Reviews</p>
+
+          <div class="rating-box">
+            <h3>Rate this movie</h3>
+            <div class="rating-buttons" id="ratingButtons">
+              <button type="button" class="rating-btn" data-rating="1">1</button>
+              <button type="button" class="rating-btn" data-rating="2">2</button>
+              <button type="button" class="rating-btn" data-rating="3">3</button>
+              <button type="button" class="rating-btn" data-rating="4">4</button>
+              <button type="button" class="rating-btn" data-rating="5">5</button>
+            </div>
+          </div>
+
+          <div class="comment-box">
+            <h3>Comments</h3>
+            <div class="comment-list" id="commentList"></div>
+
+            <form id="commentForm">
+              <textarea
+                id="commentInput"
+                rows="4"
+                placeholder="Write your comment..."
+              ></textarea>
+              <button type="submit" class="btn btn-primary">Add Comment</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Area -->
+  <div class="toast-area" id="toastArea"></div>
+
+ <script>
+  // =========================
+  // 1) 상태 관리
+  // =========================
+  const state = {
+    currentUser: null,
+    selectedGenre: "all",
+    currentMovieId: null,
+    ratingsByMovie: {},   // { [movieId]: { [userId]: rating } }
+    commentsByMovie: {},  // { [movieId]: [{ userId, nickname, text, createdAt }] }
+  };
+
+  /**
+ * ============================================
+ * 📊 MOVIES 데이터 (실제 이미지 URL 포함)
+ * ============================================
+ * 용도: 모든 영화 데이터 저장
+ * 속성: id, title, genre, rating, reviews, poster, synopsis
+ * 사용처: 티어 계산, 영화 상세 정보 표시 등 전반적으로 사용
+ */
+const MOVIES = [
+  {
+    id: 1,
+    title: '인셉션',
+    genre: '액션',
+    rating: 4.5,
+    reviews: 2340,
+    poster: 'http://www.impawards.com/2010/posters/inception.jpg',
+    synopsis: '꿈 속의 꿈으로 들어가 타겟의 잠재의식에 아이디어를 심는 스파이 액션 영화'
+  },
+  {
+    id: 2,
+    title: '다크나이트',
+    genre: '액션',
+    rating: 4.8,
+    reviews: 3120,
+    poster: 'https://images-na.ssl-images-amazon.com/images/M/MV5BMTMxNTMwODM0NF5BMl5BanBnXkFtZTcwODAyMTk2Mw@@._V1_SX300.jpg',
+    synopsis: '배트맨이 조커라는 악의 화신과 맞서는 초대작 히어로 영화'
+  },
+  {
+    id: 3,
+    title: '쇼생크 탈출',
+    genre: '드라마',
+    rating: 4.9,
+    reviews: 4560,
+    poster: 'http://www.impawards.com/1994/posters/shawshank_redemption_ver1.jpg',
+    synopsis: '무죄한 남자가 감옥에서 탈옥하기까지의 감동적인 이야기'
+  },
+  {
+    id: 4,
+    title: '포레스트 검프',
+    genre: '드라마',
+    rating: 4.7,
+    reviews: 3890,
+    poster: 'http://www.impawards.com/1994/posters/forrest_gump.jpg',
+    synopsis: '낮은 지능의 남자가 인생 전반에서 놀라운 성취를 이루는 감동 드라마'
+  },
+  {
+    id: 5,
+    title: '라이언 일병 구하기',
+    genre: '액션',
+    rating: 4.6,
+    reviews: 2780,
+    poster: 'http://www.impawards.com/1998/thumbs/imp_saving_private_ryan_ver1.jpg',
+    synopsis: '2차 세계대전 중 한 병사를 구하기 위한 미군 부대의 위험한 작전'
+  },
+  {
+    id: 6,
+    title: '타이타닉',
+    genre: '로맨스',
+    rating: 4.4,
+    reviews: 3450,
+    poster: 'http://www.impawards.com/1997/thumbs/imp_titanic_ver2.jpg',
+    synopsis: '타이타닉호 침몰 사건을 배경으로 한 비극적인 로맨스'
+  },
+  {
+    id: 7,
+    title: '어벤져스: 엔드게임',
+    genre: '액션',
+    rating: 4.5,
+    reviews: 5670,
+    poster: 'https://images-na.ssl-images-amazon.com/images/M/MV5BMTc5MDE2ODcwNV5BMl5BanBnXkFtZTgwMzI2NzQ2NzM@._V1_SX300.jpg',
+    synopsis: '마블 히어로들이 타노스와의 최종 결전을 벌이는 대서사시'
+  },
+  {
+    id: 8,
+    title: '인터스텔라',
+    genre: '판타지',
+    rating: 4.6,
+    reviews: 3210,
+    poster: 'http://www.impawards.com/2014/thumbs/imp_interstellar_ver2.jpg',
+    synopsis: '인류의 미래를 위해 블랙홀을 통과하는 우주 탐험 영화'
+  },
+  {
+    id: 9,
+    title: '라라랜드',
+    genre: '로맨스',
+    rating: 4.3,
+    reviews: 2890,
+    poster: 'http://www.impawards.com/2016/posters/la_la_land_ver3.jpg',
+    synopsis: '로스앤젤레스에서 만난 두 청년의 사랑과 꿈의 이야기'
+  },
+  {
+    id: 10,
+    title: '기생충',
+    genre: '드라마',
+    rating: 4.7,
+    reviews: 4120,
+    poster: 'http://www.impawards.com/intl/south_korea/2019/thumbs/imp_parasite.jpg',
+    synopsis: '빈곤층 가족이 부자 가족에게 기생하는 과정을 그린 사회 드라마'
+  },
+  {
+    id: 11,
+    title: '조커',
+    genre: '드라마',
+    rating: 4.5,
+    reviews: 3560,
+    poster: 'http://www.impawards.com/2024/thumbs/imp_joker_folie_a_deux_ver2.jpg',
+    synopsis: '사회에서 소외된 남자가 조커로 변해가는 심리 드라마'
+  },
+  {
+    id: 12,
+    title: '겨울왕국',
+    genre: '애니메이션',
+    rating: 4.4,
+    reviews: 4890,
+    poster: 'http://www.impawards.com/2025/thumbs/imp_frozen_the_hit_broadway_musical.jpg',
+    synopsis: '마법의 힘을 가진 여왕과 그녀의 여동생의 모험 애니메이션'
+  },
+  {
+    id: 13,
+    title: '토이 스토리 4',
+    genre: '애니메이션',
+    rating: 4.3,
+    reviews: 3670,
+    poster: 'http://www.impawards.com/2019/thumbs/imp_toy_story_four.jpg',
+    synopsis: '우디와 버즈가 새로운 친구들과 함께하는 모험'
+  },
+  {
+    id: 14,
+    title: '기묘한 이야기',
+    genre: '공포',
+    rating: 4.2,
+    reviews: 2340,
+    poster: 'http://www.impawards.com/tv/thumbs/imp_stranger_things_ver2.jpg',
+    synopsis: '초자연적 현상이 벌어지는 작은 마을의 미스터리'
+  },
+  {
+    id: 15,
+    title: '어바웃 타임',
+    genre: '로맨스',
+    rating: 4.4,
+    reviews: 2560,
+    poster: 'http://www.impawards.com/intl/uk/2013/thumbs/imp_about_time.jpg',
+    synopsis: '시간 여행 능력을 가진 남자의 사랑과 가족 이야기'
+  },
+  {
+    id: 16,
+    title: '매트릭스',
+    genre: '액션',
+    rating: 4.6,
+    reviews: 3890,
+    poster: 'http://www.impawards.com/2003/thumbs/imp_matrix_reloaded.jpg',
+    synopsis: '현실과 가상 세계의 경계를 넘나드는 SF 액션'
+  },
+  {
+    id: 17,
+    title: '글래디에이터',
+    genre: '액션',
+    rating: 4.5,
+    reviews: 2780,
+    poster: 'http://www.impawards.com/2000/thumbs/imp_gladiator_ver1.jpg',
+    synopsis: '로마 제국 시대 노예 검투사의 복수와 영광의 이야기'
+  },
+  {
+    id: 18,
+    title: '미션 임파서블',
+    genre: '액션',
+    rating: 4.3,
+    reviews: 2450,
+    poster: 'http://www.impawards.com/2023/thumbs/imp_mission_impossible__dead_reckoning_part_one_ver2.jpg',
+    synopsis: '불가능한 임무를 수행하는 스파이의 액션 어드벤처'
+  },
+  {
+    id: 19,
+    title: '라이언 고슬링의 드라이브',
+    genre: '스릴러',
+    rating: 4.2,
+    reviews: 1890,
+    poster: 'https://i.namu.wiki/i/MAKIixXrUwMVeNl5CHNNZM1HsgR-NsCimziN9-6fyoRiXUI_amWOf9w1hdDupqI7zdvXtj-NUIuf1qm5ZEhWBsZDYQUCXWDJlCgyfaxILoQQArwbA52ruHdbBMQsIc5nXUUUevnpMcxHnySKt5taGQ.webp',
+    synopsis: '영화 스턴트맨이자 운전수인 남자의 범죄 스릴러'
+  },
+  {
+    id: 20,
+    title: '아바타',
+    genre: '판타지',
+    rating: 4.4,
+    reviews: 4230,
+    poster: 'https://images-na.ssl-images-amazon.com/images/M/MV5BMTYwOTEwNjAzMl5BMl5BanBnXkFtZTcwODc5MTUwMw@@._V1_SX300.jpg',
+    synopsis: '외계 행성 판도라에서 벌어지는 인간과 나비족의 전쟁'
+  }
+];    
+
+
+  const USERS = [
+    { id: "user1", nickname: "Movie Lover" },
+    { id: "user2", nickname: "Genre Explorer" },
+    { id: "user3", nickname: "Review Collector" },
+  ];
+
+  // =========================
+  // 2) 유틸
+  // =========================
+  function getMovieById(movieId) {
+    return MOVIES.find((movie) => String(movie.id) === String(movieId));
+  }
+
+  function getUserById(userId) {
+    return USERS.find((user) => user.id === userId);
+  }
+
+  function escapeHTML(str) {
+    return String(str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function formatRating(num) {
+    return Number(num).toFixed(1);
+  }
+
+  function getTierByRating(avgRating) {
+    if (avgRating >= 4.1) return "S";
+    if (avgRating >= 3.1) return "A";
+    if (avgRating >= 2.1) return "B";
+    return "C";
+  }
+
+  function getTierLabel(tier) {
+    return {
+      S: "S Tier",
+      A: "A Tier",
+      B: "B Tier",
+      C: "C Tier",
+    }[tier];
+  }
+
+  function getTierRangeText(tier) {
+    return {
+      S: "4.1 ~ 5.0",
+      A: "3.1 ~ 4.0",
+      B: "2.1 ~ 3.0",
+      C: "0.0 ~ 2.0",
+    }[tier];
+  }
+
+  function getWeightedAverage(movieId) {
+    const movie = getMovieById(movieId);
+    if (!movie) return 0;
+
+    const userRatingsObj = state.ratingsByMovie[movieId] || {};
+    const userRatings = Object.values(userRatingsObj).map(Number);
+
+    const baseAvg = Number(movie.avgRating || 0);
+    const baseCount = Number(movie.reviewCount || 0);
+
+    const totalSum =
+      baseAvg * baseCount + userRatings.reduce((sum, rating) => sum + rating, 0);
+
+    const totalCount = baseCount + userRatings.length;
+
+    return totalCount > 0 ? totalSum / totalCount : 0;
+  }
+
+  function getDisplayedMovies() {
+    if (state.selectedGenre === "all") return MOVIES;
+    return MOVIES.filter((movie) =>
+      (movie.genres || []).some(
+        (genre) => String(genre).toLowerCase() === state.selectedGenre
+      )
+    );
+  }
+
+  function getMoviesByTier(tier) {
+    return getDisplayedMovies()
+      .map((movie) => ({
+        ...movie,
+        computedAvg: getWeightedAverage(movie.id),
+      }))
+      .filter((movie) => getTierByRating(movie.computedAvg) === tier)
+      .sort((a, b) => b.computedAvg - a.computedAvg);
+  }
+
+  function showToast(message) {
+    const toastArea = document.getElementById("toastArea");
+    if (!toastArea) return;
+
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.textContent = message;
+
+    toastArea.appendChild(toast);
+
+    setTimeout(() => {
+      toast.classList.add("show");
+    }, 10);
+
+    setTimeout(() => {
+      toast.classList.remove("show");
+      setTimeout(() => toast.remove(), 200);
+    }, 1800);
+  }
+
+  function saveSession() {
+    localStorage.setItem("movieTier_currentUser", JSON.stringify(state.currentUser));
+    localStorage.setItem("movieTier_ratings", JSON.stringify(state.ratingsByMovie));
+    localStorage.setItem("movieTier_comments", JSON.stringify(state.commentsByMovie));
+    localStorage.setItem("movieTier_selectedGenre", state.selectedGenre);
+  }
+
+  function restoreSession() {
+    const savedUser = localStorage.getItem("movieTier_currentUser");
+    const savedRatings = localStorage.getItem("movieTier_ratings");
+    const savedComments = localStorage.getItem("movieTier_comments");
+    const savedGenre = localStorage.getItem("movieTier_selectedGenre");
+
+    if (savedUser) state.currentUser = JSON.parse(savedUser);
+    if (savedRatings) state.ratingsByMovie = JSON.parse(savedRatings);
+    if (savedComments) state.commentsByMovie = JSON.parse(savedComments);
+    if (savedGenre) state.selectedGenre = savedGenre;
+  }
+
+  // =========================
+  // 3) 로그인
+  // =========================
+  function handleMockLogin(userId) {
+    const user = getUserById(userId);
+    if (!user) return;
+
+    state.currentUser = user;
+    saveSession();
+    renderLoginStatus();
+    renderAll();
+    showToast(`${user.nickname}님으로 로그인되었습니다.`);
+  }
+
+  function renderLoginStatus() {
+    const loginStatus = document.getElementById("loginStatus");
+    if (!loginStatus) return;
+
+    loginStatus.innerHTML = state.currentUser
+      ? `<p>현재 상태: <strong>${escapeHTML(state.currentUser.nickname)}</strong> 로그인 중</p>`
+      : `<p>현재 상태: 로그인 전</p>`;
+  }
+
+  // =========================
+  // 4) 장르 필터
+  // =========================
+  function handleGenreSelect(genre) {
+    state.selectedGenre = genre;
+    saveSession();
+    renderGenreButtons();
+    renderAll();
+  }
+
+  function renderGenreButtons() {
+    const genreList = document.getElementById("genreList");
+    if (!genreList) return;
+
+    const buttons = genreList.querySelectorAll(".genre-btn");
+    buttons.forEach((btn) => {
+      const genre = btn.dataset.genre;
+      btn.classList.toggle("active", genre === state.selectedGenre);
+    });
+  }
+
+  // =========================
+  // 5) 영화 카드 렌더링
+  // =========================
+  function createMovieCard(movie) {
+    const avg = getWeightedAverage(movie.id);
+    const tier = getTierByRating(avg);
+
+    return `
+      <article class="movie-card" data-movie-id="${movie.id}">
+        <div class="poster-wrap">
+          <img src="${movie.posterPath || ""}" alt="${escapeHTML(movie.title)} poster" />
+          <div class="hover-info">
+            <span>Reviews: ${movie.reviewCount + (state.ratingsByMovie[movie.id] ? Object.keys(state.ratingsByMovie[movie.id]).length : 0)}</span>
+            <span>Avg: ${formatRating(avg)}</span>
+            <span>Tier: ${tier}</span>
+          </div>
+        </div>
+        <div class="movie-info">
+          <h3>${escapeHTML(movie.title)}</h3>
+          <p>${escapeHTML((movie.genres || []).join(" · "))}</p>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderMovieGrid() {
+    const movieGrid = document.getElementById("movieGrid");
+    if (!movieGrid) return;
+
+    const movies = getDisplayedMovies();
+
+    movieGrid.innerHTML = movies.map((movie) => createMovieCard(movie)).join("");
+  }
+
+  // =========================
+  // 6) 티어 보드 렌더링
+  // =========================
+  function createTierMovieCard(movie) {
+    const avg = getWeightedAverage(movie.id);
+    return `
+      <article class="tier-movie-card" data-movie-id="${movie.id}">
+        <img src="${movie.posterPath || ""}" alt="${escapeHTML(movie.title)} poster" />
+        <div class="tier-card-meta">
+          <strong>${escapeHTML(movie.title)}</strong>
+          <span>${formatRating(avg)} / ${movie.reviewCount} reviews</span>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderTierBoard() {
+    const tierMap = {
+      S: document.getElementById("tierSList"),
+      A: document.getElementById("tierAList"),
+      B: document.getElementById("tierBList"),
+      C: document.getElementById("tierCList"),
+    };
+
+    Object.keys(tierMap).forEach((tier) => {
+      const target = tierMap[tier];
+      if (!target) return;
+
+      const movies = getMoviesByTier(tier);
+      target.innerHTML = movies.map((movie) => createTierMovieCard(movie)).join("");
+    });
+  }
+
+  // =========================
+  // 7) 상세 모달
+  // =========================
+  function openMovieModal(movieId) {
+    const movie = getMovieById(movieId);
+    if (!movie) return;
+
+    state.currentMovieId = movieId;
+
+    const backdrop = document.getElementById("movieModalBackdrop");
+    const posterImg = document.getElementById("modalPosterImg");
+    const modalTitle = document.getElementById("movieModalTitle");
+    const modalMeta = document.getElementById("movieModalMeta");
+
+    const avg = getWeightedAverage(movieId);
+    const tier = getTierByRating(avg);
+    const userRatings = state.ratingsByMovie[movieId] || {};
+    const myRating = state.currentUser ? userRatings[state.currentUser.id] : null;
+
+    if (posterImg) posterImg.src = movie.posterPath || "";
+    if (modalTitle) modalTitle.textContent = movie.title;
+    if (modalMeta) {
+      modalMeta.textContent = `${(movie.genres || []).join(" · ")} · Avg ${formatRating(avg)} · ${movie.reviewCount} reviews · ${tier} Tier`;
+    }
+
+    renderRatingButtons(myRating);
+    renderCommentList(movieId);
+
+    if (backdrop) backdrop.hidden = false;
+  }
+
+  function closeMovieModal() {
+    const backdrop = document.getElementById("movieModalBackdrop");
+    if (backdrop) backdrop.hidden = true;
+    state.currentMovieId = null;
+  }
+
+  function renderRatingButtons(activeRating) {
+    const ratingButtons = document.getElementById("ratingButtons");
+    if (!ratingButtons) return;
+
+    const buttons = ratingButtons.querySelectorAll(".rating-btn");
+    buttons.forEach((btn) => {
+      btn.classList.toggle("active", Number(btn.dataset.rating) === Number(activeRating));
+    });
+  }
+
+    function handleRatingSubmit(movieId, rating) {
+    if (!state.currentUser) {
+      showToast("로그인 후 별점을 매길 수 있습니다.");
+      return;
+    }
+
+    if (!state.ratingsByMovie[movieId]) {
+      state.ratingsByMovie[movieId] = {};
+    }
+
+    state.ratingsByMovie[movieId][state.currentUser.id] = Number(rating);
+    saveSession();
+
+    const movie = getMovieById(movieId);
+    const avg = getWeightedAverage(movieId);
+    const tier = getTierByRating(avg);
+
+    renderAll();
+
+    // 모달이 열려 있으면 별점 active 상태 다시 반영
+    if (String(state.currentMovieId) === String(movieId)) {
+      renderRatingButtons(Number(rating));
+      renderCommentList(movieId);
+
+      const modalMeta = document.getElementById("movieModalMeta");
+      if (modalMeta && movie) {
+        modalMeta.textContent =
+          `${(movie.genres || []).join(" · ")} · Avg ${formatRating(avg)} · ` +
+          `${movie.reviewCount} reviews · ${tier} Tier`;
+      }
+    }
+
+    showToast(`${movie?.title || "영화"}에 ${rating}점을 저장했습니다.`);
+  }
+
+  // =========================
+  // 8) 코멘트
+  // =========================
+  function renderCommentList(movieId) {
+    const commentList = document.getElementById("commentList");
+    if (!commentList) return;
+
+    const comments = state.commentsByMovie[movieId] || [];
+
+    if (comments.length === 0) {
+      commentList.innerHTML = `<p class="empty-comment">아직 코멘트가 없습니다.</p>`;
+      return;
+    }
+
+    commentList.innerHTML = comments
+      .slice()
+      .reverse()
+      .map((comment) => {
+        const userLabel = comment.nickname || "Anonymous";
+        const createdAt = comment.createdAt
+          ? new Date(comment.createdAt).toLocaleString("ko-KR")
+          : "";
+
+        return `
+          <div class="comment-item">
+            <strong>${escapeHTML(userLabel)}</strong>
+            <p>${escapeHTML(comment.text)}</p>
+            <span>${escapeHTML(createdAt)}</span>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  function handleCommentSubmit(event) {
+    event.preventDefault();
+
+    if (!state.currentUser) {
+      showToast("로그인 후 코멘트를 작성할 수 있습니다.");
+      return;
+    }
+
+    if (!state.currentMovieId) return;
+
+    const commentInput = document.getElementById("commentInput");
+    if (!commentInput) return;
+
+    const text = commentInput.value.trim();
+    if (!text) {
+      showToast("코멘트를 입력하세요.");
+      return;
+    }
+
+    if (!state.commentsByMovie[state.currentMovieId]) {
+      state.commentsByMovie[state.currentMovieId] = [];
+    }
+
+    state.commentsByMovie[state.currentMovieId].push({
+      userId: state.currentUser.id,
+      nickname: state.currentUser.nickname,
+      text,
+      createdAt: new Date().toISOString(),
+    });
+
+    commentInput.value = "";
+    saveSession();
+    renderCommentList(state.currentMovieId);
+    showToast("코멘트가 추가되었습니다.");
+  }
+
+  // =========================
+  // 9) 공유 기능
+  // =========================
+  async function handleShare() {
+    const shareData = {
+      title: "Movie Tier List",
+      text: "나만의 영화 티어 리스트를 확인해보세요.",
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        showToast("공유 완료");
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(window.location.href);
+        showToast("링크가 복사되었습니다.");
+      } else {
+        showToast("이 브라우저에서는 공유 기능을 사용할 수 없습니다.");
+      }
+    } catch (error) {
+      showToast("공유를 취소했거나 실패했습니다.");
+    }
+  }
+
+  // =========================
+  // 10) 전체 렌더
+  // =========================
+  function renderAll() {
+    renderLoginStatus();
+    renderGenreButtons();
+    renderMovieGrid();
+    renderTierBoard();
+  }
+
+  // =========================
+  // 11) 이벤트 바인딩
+  // =========================
+  function bindEvents() {
+    // 로그인 카드
+    const loginList = document.getElementById("loginList");
+    if (loginList) {
+      loginList.addEventListener("click", (event) => {
+        const btn = event.target.closest(".login-card");
+        if (!btn) return;
+        handleMockLogin(btn.dataset.userId);
+      });
+    }
+
+    // 장르 버튼
+    const genreList = document.getElementById("genreList");
+    if (genreList) {
+      genreList.addEventListener("click", (event) => {
+        const btn = event.target.closest(".genre-btn");
+        if (!btn) return;
+        handleGenreSelect(btn.dataset.genre);
+      });
+    }
+
+    // 영화 카드 클릭 -> 모달 열기
+    const movieGrid = document.getElementById("movieGrid");
+    if (movieGrid) {
+      movieGrid.addEventListener("click", (event) => {
+        const card = event.target.closest(".movie-card");
+        if (!card) return;
+        openMovieModal(card.dataset.movieId);
+      });
+    }
+
+    // 티어 카드 클릭 -> 모달 열기
+    const tierBoard = document.getElementById("tierBoard");
+    if (tierBoard) {
+      tierBoard.addEventListener("click", (event) => {
+        const card = event.target.closest(".tier-movie-card");
+        if (!card) return;
+        openMovieModal(card.dataset.movieId);
+      });
+    }
+
+    // 별점 버튼
+    const ratingButtons = document.getElementById("ratingButtons");
+    if (ratingButtons) {
+      ratingButtons.addEventListener("click", (event) => {
+        const btn = event.target.closest(".rating-btn");
+        if (!btn || !state.currentMovieId) return;
+        handleRatingSubmit(state.currentMovieId, btn.dataset.rating);
+      });
+    }
+
+    // 코멘트 제출
+    const commentForm = document.getElementById("commentForm");
+    if (commentForm) {
+      commentForm.addEventListener("submit", handleCommentSubmit);
+    }
+
+    // 모달 닫기
+    const movieModalClose = document.getElementById("movieModalClose");
+    const movieModalBackdrop = document.getElementById("movieModalBackdrop");
+
+    if (movieModalClose) {
+      movieModalClose.addEventListener("click", closeMovieModal);
+    }
+
+    if (movieModalBackdrop) {
+      movieModalBackdrop.addEventListener("click", (event) => {
+        if (event.target === movieModalBackdrop) {
+          closeMovieModal();
+        }
+      });
+    }
+
+    // 상단 버튼
+    const shareBtn = document.getElementById("shareBtn");
+    if (shareBtn) shareBtn.addEventListener("click", handleShare);
+
+    const loginBtn = document.getElementById("loginBtn");
+    if (loginBtn) {
+      loginBtn.addEventListener("click", () => {
+        document.getElementById("loginSection")?.scrollIntoView({ behavior: "smooth" });
+      });
+    }
+
+    const startBtn = document.getElementById("startBtn");
+    if (startBtn) {
+      startBtn.addEventListener("click", () => {
+        document.getElementById("movieSection")?.scrollIntoView({ behavior: "smooth" });
+      });
+    }
+
+    const openGenresBtn = document.getElementById("openGenresBtn");
+    if (openGenresBtn) {
+      openGenresBtn.addEventListener("click", () => {
+        document.getElementById("genreSection")?.scrollIntoView({ behavior: "smooth" });
+      });
+    }
+  }
+
+  // =========================
+  // 12) 초기화
+  // =========================
+  function init() {
+    restoreSession();
+    bindEvents();
+    renderAll();
+
+    // 저장된 영화가 있으면 모달 닫힌 상태로 시작
+    closeMovieModal();
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

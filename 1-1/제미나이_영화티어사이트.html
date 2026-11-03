@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineTier - Letterboxd Style Movie Tier Maker</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            bg: '#14181c',
+                            card: '#1f2937',
+                            hover: '#2c3748',
+                            green: '#00e054',
+                            orange: '#ff8000',
+                            blue: '#40bcf4',
+                            yellow: '#ffcc00'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #14181c;
+            color: #9ab;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            user-select: none;
+        }
+
+        /* 드래그 앤 드롭 관련 클래스 */
+        .dragging {
+            opacity: 0.4;
+            transform: scale(0.95);
+        }
+
+        .drag-over {
+            background-color: rgba(255, 255, 255, 0.08);
+            border-color: #00e054 !important;
+        }
+
+        /* 커스텀 스크롤바 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #14181c;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2c3440;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #456;
+        }
+
+        .tier-label {
+            writing-mode: horizontal-tb;
+            text-orientation: mixed;
+        }
+
+        /* 카드 호버 오버레이 */
+        .movie-card:hover .card-overlay {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+    <!-- 상단 네비게이션 바 -->
+    <header class="bg-[#1b2228] border-b border-[#2c3440] sticky top-0 z-30 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <!-- 로고 및 서브타이틀 -->
+            <div class="flex items-center space-x-3">
+                <div class="flex items-center space-x-1 font-black text-2xl tracking-tight text-white">
+                    <span class="text-[#ff8000]"><i class="fa-solid fa-film"></i></span>
+                    <span class="tracking-widest">CINE<span class="text-[#00e054]">TIER</span></span>
+                </div>
+                <span class="hidden md:inline-block text-xs bg-[#2c3440] text-gray-300 px-2 py-0.5 rounded font-medium">Letterboxd Style</span>
+            </div>
+
+            <!-- 우측 액션 & 사용자 프레임 -->
+            <div class="flex items-center space-x-3 sm:space-x-4">
+                <!-- 영화 추가 버튼 -->
+                <button onclick="openAddMovieModal()" class="bg-[#2c3440] hover:bg-[#3d4857] text-white text-xs sm:text-sm px-3 py-1.5 rounded-md font-semibold transition flex items-center space-x-1 border border-gray-700">
+                    <i class="fa-solid fa-plus text-[#00e054]"></i>
+                    <span class="hidden sm:inline">영화 추가</span>
+                </button>
+
+                <!-- 초기화 버튼 -->
+                <button onclick="confirmReset()" class="bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 text-xs sm:text-sm px-3 py-1.5 rounded-md font-semibold transition flex items-center space-x-1 border border-red-900/50">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span>처음으로</span>
+                </button>
+
+                <!-- 사용자 드롭다운 -->
+                <div class="relative inline-block text-left">
+                    <div class="flex items-center bg-[#14181c] border border-[#2c3440] rounded-md px-2 py-1 space-x-2">
+                        <i class="fa-solid fa-circle-user text-lg text-[#00e054]"></i>
+                        <select id="userSelect" onchange="changeUser(this.value)" class="bg-transparent text-white text-xs sm:text-sm font-medium focus:outline-none cursor-pointer pr-1">
+                            <option value="cinema_fan" class="bg-[#1f2937] text-white">cinema_fan</option>
+                            <option value="movie_buff" class="bg-[#1f2937] text-white">movie_buff</option>
+                            <option value="film_critic" class="bg-[#1f2937] text-white">film_critic</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-6 lg:px-8 py-6 space-y-8">
+
+        <!-- 안내 및 추천 액션 바 -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#1b2228] p-4 rounded-xl border border-[#2c3440] shadow-sm gap-4">
+            <div>
+                <h1 class="text-white text-lg font-bold flex items-center gap-2">
+                    <span id="currentUserName" class="text-[#ff8000]">cinema_fan</span>님의 영화 티어표
+                </h1>
+                <p class="text-xs text-gray-400 mt-0.5">영화를 드래그하거나 클릭하여 원하는 티어로 분류하세요.</p>
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <button onclick="openRecommendationModal()" class="w-full sm:w-auto bg-[#00e054] hover:bg-[#00c047] text-black font-bold text-xs sm:text-sm px-4 py-2 rounded-lg transition flex items-center justify-center space-x-2 shadow-md">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>장르별 영화 추천받기</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 티어 매이커 컨테이너 (S, A, B, C) -->
+        <section class="space-y-2">
+            <!-- S Tier -->
+            <div class="tier-row flex border border-[#2c3440] rounded-lg overflow-hidden bg-[#181e23] min-h-[120px]">
+                <div class="tier-label bg-gradient-to-br from-red-600 to-amber-600 w-20 sm:w-28 flex flex-col items-center justify-center font-black text-2xl sm:text-3xl text-white shadow-inner flex-shrink-0">
+                    <span>S</span>
+                    <span class="text-[10px] font-normal opacity-80 uppercase tracking-widest mt-1">Masterpiece</span>
+                </div>
+                <div class="tier-dropzone flex-1 p-2 sm:p-3 flex flex-wrap gap-2 sm:gap-3 items-center min-h-[120px] transition" data-tier="S" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+                    <!-- S 티어 영화 카드 배치 영역 -->
+                </div>
+            </div>
+
+            <!-- A Tier -->
+            <div class="tier-row flex border border-[#2c3440] rounded-lg overflow-hidden bg-[#181e23] min-h-[120px]">
+                <div class="tier-label bg-gradient-to-br from-purple-600 to-indigo-600 w-20 sm:w-28 flex flex-col items-center justify-center font-black text-2xl sm:text-3xl text-white shadow-inner flex-shrink-0">
+                    <span>A</span>
+                    <span class="text-[10px] font-normal opacity-80 uppercase tracking-widest mt-1">Great</span>
+                </div>
+                <div class="tier-dropzone flex-1 p-2 sm:p-3 flex flex-wrap gap-2 sm:gap-3 items-center min-h-[120px] transition" data-tier="A" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+                    <!-- A 티어 영화 카드 배치 영역 -->
+                </div>
+            </div>
+
+            <!-- B Tier -->
+            <div class="tier-row flex border border-[#2c3440] rounded-lg overflow-hidden bg-[#181e23] min-h-[120px]">
+                <div class="tier-label bg-gradient-to-br from-blue-600 to-cyan-600 w-20 sm:w-28 flex flex-col items-center justify-center font-black text-2xl sm:text-3xl text-white shadow-inner flex-shrink-0">
+                    <span>B</span>
+                    <span class="text-[10px] font-normal opacity-80 uppercase tracking-widest mt-1">Good</span>
+                </div>
+                <div class="tier-dropzone flex-1 p-2 sm:p-3 flex flex-wrap gap-2 sm:gap-3 items-center min-h-[120px] transition" data-tier="B" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+                    <!-- B 티어 영화 카드 배치 영역 -->
+                </div>
+            </div>
+
+            <!-- C Tier -->
+            <div class="tier-row flex border border-[#2c3440] rounded-lg overflow-hidden bg-[#181e23] min-h-[120px]">
+                <div class="tier-label bg-gradient-to-br from-emerald-600 to-teal-700 w-20 sm:w-28 flex flex-col items-center justify-center font-black text-2xl sm:text-3xl text-white shadow-inner flex-shrink-0">
+                    <span>C</span>
+                    <span class="text-[10px] font-normal opacity-80 uppercase tracking-widest mt-1">Average</span>
+                </div>
+                <div class="tier-dropzone flex-1 p-2 sm:p-3 flex flex-wrap gap-2 sm:gap-3 items-center min-h-[120px] transition" data-tier="C" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+                    <!-- C 티어 영화 카드 배치 영역 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 미분류 영화 영역 -->
+        <section class="bg-[#1b2228] p-4 rounded-xl border border-[#2c3440] shadow-sm space-y-3">
+            <div class="flex items-center justify-between border-b border-[#2c3440] pb-3">
+                <h2 class="text-white font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-list-ul text-[#40bcf4]"></i>
+                    <span>미분류 영화 목록</span>
+                    <span id="unassignedCount" class="text-xs bg-[#2c3440] text-gray-300 px-2 py-0.5 rounded-full">0</span>
+                </h2>
+                <span class="text-xs text-gray-400">카드를 드래그하거나 클릭하여 티어를 선택하세요.</span>
+            </div>
+
+            <div id="unassignedZone" class="tier-dropzone flex flex-wrap gap-2 sm:gap-3 items-center min-h-[140px] p-2 rounded-lg transition" data-tier="unassigned" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+                <!-- 미분류 카드 배치 영역 -->
+            </div>
+        </section>
+    </main>
+
+    <!-- 푸터 -->
+    <footer class="bg-[#1b2228] border-t border-[#2c3440] py-6 mt-12 text-center text-xs text-gray-500">
+        <p>© CineTier Portfolio Project - Styled inspired by Letterboxd UI</p>
+        <p class="mt-1">Designed for interactive film tier lists & custom recommendations.</p>
+    </footer>
+
+    <!-- ================================================= ================= -->
+    <!-- MODALS SECTION -->
+    <!-- ================================================= ================= -->
+
+    <!-- 1. 영화 상세 정보 및 코멘트 모달 -->
+    <div id="movieDetailModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#1b2228] border border-[#2c3440] w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-4 bg-[#14181c] border-b border-[#2c3440] flex justify-between items-center">
+                <h3 id="modalTitle" class="text-white font-bold text-lg">영화 제목</h3>
+                <button onclick="closeModal('movieDetailModal')" class="text-gray-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto space-y-6 flex-1">
+                <div class="flex flex-col sm:flex-row gap-6">
+                    <!-- 포스터 이미지 -->
+                    <img id="modalPoster" src="" alt="Poster" class="w-36 h-52 object-cover rounded-lg border border-gray-700 shadow-md flex-shrink-0 mx-auto sm:mx-0">
+                    
+                    <!-- 영화 상세 내용 -->
+                    <div class="space-y-3 flex-1">
+                        <div class="flex items-center space-x-2">
+                            <span id="modalGenre" class="bg-[#2c3440] text-[#00e054] text-xs font-semibold px-2.5 py-1 rounded-full">장르</span>
+                            <span class="text-gray-400 text-xs flex items-center gap-1">
+                                <i class="fa-solid fa-star text-amber-400"></i>
+                                <span id="modalRating" class="text-white font-bold">0.0</span> / 5.0
+                            </span>
+                            <span class="text-gray-400 text-xs">
+                                (<span id="modalReviews">0</span>개 리뷰)
+                            </span>
+                        </div>
+                        
+                        <h4 class="text-xs uppercase tracking-wider text-gray-400 font-bold">SYNOPSIS</h4>
+                        <p id="modalSynopsis" class="text-sm text-gray-300 leading-relaxed">시놉시스 내용이 여기에 들어갑니다.</p>
+
+                        <!-- 카드 모바일/클릭 티어 변경 유틸 -->
+                        <div class="pt-2 border-t border-gray-800">
+                            <label class="block text-xs font-semibold text-gray-400 mb-2">현재 티어 변경하기</label>
+                            <div id="modalTierButtons" class="flex flex-wrap gap-2">
+                                <!-- JS로 버튼 dynamic 추가 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 코멘트 세션 -->
+                <div class="border-t border-[#2c3440] pt-4 space-y-4">
+                    <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i class="fa-regular fa-comments text-[#00e054]"></i>
+                        <span>사용자 토론 코멘트</span>
+                    </h4>
+
+                    <!-- 코멘트 입력 -->
+                    <div class="flex gap-2">
+                        <input type="text" id="commentInput" placeholder="이 영화에 대한 의견을 남겨보세요..." class="flex-1 bg-[#14181c] border border-[#2c3440] text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#00e054]">
+                        <button onclick="addComment()" class="bg-[#00e054] text-black font-bold text-sm px-4 py-2 rounded-lg hover:bg-[#00c047] transition">작성</button>
+                    </div>
+
+                    <!-- 코멘트 리스트 -->
+                    <div id="commentsList" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        <!-- 동적 작성 코멘트 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 새 영화 추가 모달 -->
+    <div id="addMovieModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#1b2228] border border-[#2c3440] w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+            <div class="p-4 bg-[#14181c] border-b border-[#2c3440] flex justify-between items-center">
+                <h3 class="text-white font-bold text-base">새 영화 추가</h3>
+                <button onclick="closeModal('addMovieModal')" class="text-gray-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <form id="addMovieForm" onsubmit="handleAddMovie(event)" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-300 mb-1">영화 제목 <span class="text-red-500">*</span></label>
+                    <input type="text" id="newTitle" required placeholder="예: 인셉션" class="w-full bg-[#14181c] border border-[#2c3440] text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#00e054]">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-300 mb-1">장르</label>
+                    <select id="newGenre" class="w-full bg-[#14181c] border border-[#2c3440] text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#00e054]">
+                        <option value="액션">액션</option>
+                        <option value="드라마">드라마</option>
+                        <option value="로맨스">로맨스</option>
+                        <option value="판타지">판타지</option>
+                        <option value="애니메이션">애니메이션</option>
+                        <option value="공포">공포</option>
+                        <option value="스릴러">스릴러</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-300 mb-1">포스터 이미지 URL (선택)</label>
+                    <input type="url" id="newPoster" placeholder="https://..." class="w-full bg-[#14181c] border border-[#2c3440] text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#00e054]">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-300 mb-1">줄거리 / 개요</label>
+                    <textarea id="newSynopsis" rows="3" placeholder="영화에 대한 간단한 설명을 적어주세요." class="w-full bg-[#14181c] border border-[#2c3440] text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#00e054] resize-none"></textarea>
+                </div>
+
+                <div class="pt-2 flex justify-end space-x-2">
+                    <button type="button" onclick="closeModal('addMovieModal')" class="px-4 py-2 bg-[#2c3440] text-gray-300 text-xs font-semibold rounded-lg hover:bg-gray-700 transition">취소</button>
+                    <button type="submit" class="px-4 py-2 bg-[#00e054] text-black text-xs font-bold rounded-lg hover:bg-[#00c047] transition">영화 등록</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3. 추천 온보딩 및 별점 선택 모달 -->
+    <div id="recommendationModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#1b2228] border border-[#2c3440] w-full max-w-lg rounded-xl shadow-2xl overflow-hidden p-6 space-y-6">
+            <!-- Step 1: 장르 선택 -->
+            <div id="recommendStep1" class="space-y-4">
+                <div class="text-center space-y-1">
+                    <h3 class="text-lg font-bold text-white">맞춤 영화 추천 Wizard 🎬</h3>
+                    <p class="text-xs text-gray-400">가장 선호하는 영화 장르를 하나 선택하세요.</p>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 py-2">
+                    <button onclick="selectGenre('액션')" class="p-3 bg-[#14181c] border border-[#2c3440] hover:border-[#00e054] hover:text-[#00e054] text-white rounded-lg text-sm font-semibold transition flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-burst text-lg"></i> 액션
+                    </button>
+                    <button onclick="selectGenre('드라마')" class="p-3 bg-[#14181c] border border-[#2c3440] hover:border-[#00e054] hover:text-[#00e054] text-white rounded-lg text-sm font-semibold transition flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-[#00e054] fa-masks-theater text-lg"></i> 드라마
+                    </button>
+                    <button onclick="selectGenre('로맨스')" class="p-3 bg-[#14181c] border border-[#2c3440] hover:border-[#00e054] hover:text-[#00e054] text-white rounded-lg text-sm font-semibold transition flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-heart text-lg"></i> 로맨스
+                    </button>
+                    <button onclick="selectGenre('판타지')" class="p-3 bg-[#14181c] border border-[#2c3440] hover:border-[#00e054] hover:text-[#00e054] text-white rounded-lg text-sm font-semibold transition flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-wand-magic-sparkles text-lg"></i> 판타지
+                    </button>
+                    <button onclick="selectGenre('애니메이션')" class="p-3 bg-[#14181c] border border-[#2c3440] hover:border-[#00e054] hover:text-[#00e054] text-white rounded-lg text-sm font-semibold transition flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-dragon text-lg"></i> 애니메이션
+                    </button>
+                    <button onclick="selectGenre('스릴러')" class="p-3 bg-[#14181c] border border-[#2c3440] hover:border-[#00e054] hover:text-[#00e054] text-white rounded-lg text-sm font-semibold transition flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-user-ninja text-lg"></i> 스릴러
+                    </button>
+                </div>
+
+                <div class="flex justify-end">
+                    <button onclick="closeModal('recommendationModal')" class="text-xs text-gray-400 hover:text-white underline">닫기</button>
+                </div>
+            </div>
+
+            <!-- Step 2: 추천 영화 제안 & 평가 -->
+            <div id="recommendStep2" class="space-y-4 hidden">
+                <div class="text-center space-y-1">
+                    <span class="text-xs text-[#00e054] font-bold uppercase tracking-wider" id="recommendedGenreLabel">액션</span>
+                    <h3 class="text-lg font-bold text-white">이 영화는 어떠신가요?</h3>
+                </div>
+
+                <div id="recommendedMovieContainer" class="bg-[#14181c] p-4 rounded-xl border border-[#2c3440] flex flex-col items-center text-center space-y-3">
+                    <!-- 추천 영화 정보 dynamic 삽입 -->
+                </div>
+
+                <!-- 별점 평가 영역 -->
+                <div class="text-center space-y-2">
+                    <p class="text-xs text-gray-400">내 평가 남기기 (선택)</p>
+                    <div class="flex justify-center space-x-2 text-2xl text-amber-400 cursor-pointer" id="starRatingBox">
+                        <i class="fa-regular fa-star hover:scale-110 transition" onclick="setRecRating(1)"></i>
+                        <i class="fa-regular fa-star hover:scale-110 transition" onclick="setRecRating(2)"></i>
+                        <i class="fa-regular fa-star hover:scale-110 transition" onclick="setRecRating(3)"></i>
+                        <i class="fa-regular fa-star hover:scale-110 transition" onclick="setRecRating(4)"></i>
+                        <i class="fa-regular fa-star hover:scale-110 transition" onclick="setRecRating(5)"></i>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center pt-2">
+                    <button onclick="closeModal('recommendationModal')" class="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded">스킵 / 닫기</button>
+                    <button onclick="applyRecommendationTier()" class="bg-[#00e054] text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#00c047] transition">자동 티어에 배치하기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 커스텀 알림/경고 토스트 메시지 -->
+    <div id="toastMessage" class="fixed bottom-6 right-6 bg-[#1f2937] border border-[#00e054] text-white text-sm px-4 py-3 rounded-lg shadow-xl hidden z-50 flex items-center space-x-2">
+        <i class="fa-solid fa-circle-info text-[#00e054]"></i>
+        <span id="toastText">메시지가 표시됩니다.</span>
+    </div>
+
+    <!-- ================================================= ================= -->
+    <!-- JAVASCRIPT LOGIC -->
+    <!-- ================================================= ================= -->
+    <script>
+        /**
+         * 📊 기본 MOVIES 데이터 세트 (20개 영화 전체)
+         */
+        const INITIAL_MOVIES = [
+            { id: 1, title: '인셉션', genre: '액션', rating: 4.5, reviews: 2340, poster: 'http://www.impawards.com/2010/posters/inception.jpg', synopsis: '꿈 속의 꿈으로 들어가 타겟의 잠재의식에 아이디어를 심는 스파이 액션 영화' },
+            { id: 2, title: '다크나이트', genre: '액션', rating: 4.8, reviews: 3120, poster: 'https://images-na.ssl-images-amazon.com/images/M/MV5BMTMxNTMwODM0NF5BMl5BanBnXkFtZTcwODAyMTk2Mw@@._V1_SX300.jpg', synopsis: '배트맨이 조커라는 악의 화신과 맞서는 초대작 히어로 영화' },
+            { id: 3, title: '쇼생크 탈출', genre: '드라마', rating: 4.9, reviews: 4560, poster: 'http://www.impawards.com/1994/posters/shawshank_redemption_ver1.jpg', synopsis: '무죄한 남자가 감옥에서 탈옥하기까지의 감동적인 이야기' },
+            { id: 4, title: '포레스트 검프', genre: '드라마', rating: 4.7, reviews: 3890, poster: 'http://www.impawards.com/1994/posters/forrest_gump.jpg', synopsis: '낮은 지능의 남자가 인생 전반에서 놀라운 성취를 이루는 감동 드라마' },
+            { id: 5, title: '라이언 일병 구하기', genre: '액션', rating: 4.6, reviews: 2780, poster: 'http://www.impawards.com/1998/thumbs/imp_saving_private_ryan_ver1.jpg', synopsis: '2차 세계대전 중 한 병사를 구하기 위한 미군 부대의 위험한 작전' },
+            { id: 6, title: '타이타닉', genre: '로맨스', rating: 4.4, reviews: 3450, poster: 'http://www.impawards.com/1997/thumbs/imp_titanic_ver2.jpg', synopsis: '타이타닉호 침몰 사건을 배경으로 한 비극적인 로맨스' },
+            { id: 7, title: '어벤져스: 엔드게임', genre: '액션', rating: 4.5, reviews: 5670, poster: 'https://images-na.ssl-images-amazon.com/images/M/MV5BMTc5MDE2ODcwNV5BMl5BanBnXkFtZTgwMzI2NzQ2NzM@._V1_SX300.jpg', synopsis: '마블 히어로들이 타노스와의 최종 결전을 벌이는 대서사시' },
+            { id: 8, title: '인터스텔라', genre: '판타지', rating: 4.6, reviews: 3210, poster: 'http://www.impawards.com/2014/thumbs/imp_interstellar_ver2.jpg', synopsis: '인류의 미래를 위해 블랙홀을 통과하는 우주 탐험 영화' },
+            { id: 9, title: '라라랜드', genre: '로맨스', rating: 4.3, reviews: 2890, poster: 'http://www.impawards.com/2016/posters/la_la_land_ver3.jpg', synopsis: '로스앤젤레스에서 만난 두 청년의 사랑과 꿈의 이야기' },
+            { id: 10, title: '기생충', genre: '드라마', rating: 4.7, reviews: 4120, poster: 'http://www.impawards.com/intl/south_korea/2019/thumbs/imp_parasite.jpg', synopsis: '빈곤층 가족이 부자 가족에게 기생하는 과정을 그린 사회 드라마' },
+            { id: 11, title: '조커', genre: '드라마', rating: 4.5, reviews: 3560, poster: 'http://www.impawards.com/2024/thumbs/imp_joker_folie_a_deux_ver2.jpg', synopsis: '사회에서 소외된 남자가 조커로 변해가는 심리 드라마' },
+            { id: 12, title: '겨울왕국', genre: '애니메이션', rating: 4.4, reviews: 4890, poster: 'http://www.impawards.com/2025/thumbs/imp_frozen_the_hit_broadway_musical.jpg', synopsis: '마법의 힘을 가진 여왕과 그녀의 여동생의 모험 애니메이션' },
+            { id: 13, title: '토이 스토리 4', genre: '애니메이션', rating: 4.3, reviews: 3670, poster: 'http://www.impawards.com/2019/thumbs/imp_toy_story_four.jpg', synopsis: '우디와 버즈가 새로운 친구들과 함께하는 모험' },
+            { id: 14, title: '기묘한 이야기', genre: '공포', rating: 4.2, reviews: 2340, poster: 'http://www.impawards.com/tv/thumbs/imp_stranger_things_ver2.jpg', synopsis: '초자연적 현상이 벌어지는 작은 마을의 미스터리' },
+            { id: 15, title: '어바웃 타임', genre: '로맨스', rating: 4.4, reviews: 2560, poster: 'http://www.impawards.com/intl/uk/2013/thumbs/imp_about_time.jpg', synopsis: '시간 여행 능력을 가진 남자의 사랑과 가족 이야기' },
+            { id: 16, title: '매트릭스', genre: '액션', rating: 4.6, reviews: 3890, poster: 'http://www.impawards.com/2003/thumbs/imp_matrix_reloaded.jpg', synopsis: '현실과 가상 세계의 경계를 넘나드는 SF 액션' },
+            { id: 17, title: '글래디에이터', genre: '액션', rating: 4.5, reviews: 2780, poster: 'http://www.impawards.com/2000/thumbs/imp_gladiator_ver1.jpg', synopsis: '로마 제국 시대 노예 검투사의 복수와 영광의 이야기' },
+            { id: 18, title: '미션 임파서블', genre: '액션', rating: 4.3, reviews: 2450, poster: 'http://www.impawards.com/2023/thumbs/imp_mission_impossible__dead_reckoning_part_one_ver2.jpg', synopsis: '불가능한 임무를 수행하는 스파이의 액션 어드벤처' },
+            { id: 19, title: '라이언 고슬링의 드라이브', genre: '스릴러', rating: 4.2, reviews: 1890, poster: 'https://i.namu.wiki/i/MAKIixXrUwMVeNl5CHNNZM1HsgR-NsCimziN9-6fyoRiXUI_amWOf9w1hdDupqI7zdvXtj-NUIuf1qm5ZEhWBsZDYQUCXWDJlCgyfaxILoQQArwbA52ruHdbBMQsIc5nXUUUevnpMcxHnySKt5taGQ.webp', synopsis: '영화 스턴트맨이자 운전수인 남자의 범죄 스릴러' },
+            { id: 20, title: '아바타', genre: '판타지', rating: 4.4, reviews: 4230, poster: 'https://images-na.ssl-images-amazon.com/images/M/MV5BMTYwOTEwNjAzMl5BMl5BanBnXkFtZTcwODc5MTUwMw@@._V1_SX300.jpg', synopsis: '외계 행성 판도라에서 벌어지는 인간과 나비족의 전쟁' }
+        ];
+
+        // 앱 상태 변수
+        let moviesList = [];
+        let currentUser = 'cinema_fan';
+        let userTiers = {
+            'cinema_fan': {},
+            'movie_buff': {},
+            'film_critic': {}
+        };
+        let userComments = {}; // { movieId: [{ user, text, date }] }
+        let currentActiveMovieId = null;
+        let recommendedMovieTemp = null;
+        let currentRecRating = 0;
+
+        // 초기화 함수
+        window.onload = function() {
+            loadStoredData();
+            renderAllTiers();
+        };
+
+        /**
+         * LocalStorage 데이터 로딩 및 동기화
+         */
+        function loadStoredData() {
+            const savedMovies = localStorage.getItem('cine_movies');
+            const savedTiers = localStorage.getItem('cine_user_tiers');
+            const savedComments = localStorage.getItem('cine_comments');
+
+            moviesList = savedMovies ? JSON.parse(savedMovies) : [...INITIAL_MOVIES];
+            userTiers = savedTiers ? JSON.parse(savedTiers) : { 'cinema_fan': {}, 'movie_buff': {}, 'film_critic': {} };
+            userComments = savedComments ? JSON.parse(savedComments) : {
+                1: [{ user: 'film_critic', text: '크리스토퍼 놀란의 걸작.', date: '2026-03-10' }]
+            };
+
+            document.getElementById('userSelect').value = currentUser;
+            document.getElementById('currentUserName').innerText = currentUser;
+        }
+
+        /**
+         * State 변경 시 LocalStorage에 자동 저장
+         */
+        function saveData() {
+            localStorage.setItem('cine_movies', JSON.stringify(moviesList));
+            localStorage.setItem('cine_user_tiers', JSON.stringify(userTiers));
+            localStorage.setItem('cine_comments', JSON.stringify(userComments));
+        }
+
+        /**
+         * 사용자 변경 처리
+         */
+        function changeUser(user) {
+            currentUser = user;
+            document.getElementById('currentUserName').innerText = currentUser;
+            renderAllTiers();
+            showToast(`${currentUser} 계정으로 전환되었습니다.`);
+        }
+
+        /**
+         * 전체 티어 및 미분류 영역 렌더링
+         */
+        function renderAllTiers() {
+            const tiers = ['S', 'A', 'B', 'C'];
+            const currentTiersMap = userTiers[currentUser] || {};
+
+            // 모든 티어 존 비우기
+            tiers.forEach(t => {
+                const zone = document.querySelector(`.tier-dropzone[data-tier="${t}"]`);
+                if(zone) zone.innerHTML = '';
+            });
+
+            const unassignedZone = document.getElementById('unassignedZone');
+            unassignedZone.innerHTML = '';
+
+            let unassignedCount = 0;
+
+            // 영화 카드 배치
+            moviesList.forEach(movie => {
+                const assignedTier = currentTiersMap[movie.id];
+                const cardEl = createMovieCard(movie);
+
+                if (assignedTier && tiers.includes(assignedTier)) {
+                    const zone = document.querySelector(`.tier-dropzone[data-tier="${assignedTier}"]`);
+                    if(zone) zone.appendChild(cardEl);
+                } else {
+                    unassignedZone.appendChild(cardEl);
+                    unassignedCount++;
+                }
+            });
+
+            document.getElementById('unassignedCount').innerText = unassignedCount;
+        }
+
+        /**
+         * 영화 카드 DOM 생성 (드래그, 클릭, 호버 포함)
+         */
+        function createMovieCard(movie) {
+            const card = document.createElement('div');
+            card.className = 'movie-card relative w-20 sm:w-24 h-28 sm:h-36 bg-[#1f2937] rounded-lg overflow-hidden border border-[#2c3440] shadow cursor-grab flex-shrink-0 transition transform hover:-translate-y-1 hover:shadow-lg hover:border-[#00e054]';
+            card.setAttribute('draggable', 'true');
+            card.setAttribute('data-id', movie.id);
+
+            // 포스터 이미지 대체 URL 생성기 (이미지 에러 처리)
+            const fallbackBg = `https://placehold.co/300x450/1f2937/00e054?text=${encodeURIComponent(movie.title)}`;
+
+            card.innerHTML = `
+                <img src="${movie.poster}" alt="${movie.title}" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='${fallbackBg}';">
+                
+                <!-- Hover Overlay (평점 & 리뷰 수) -->
+                <div class="card-overlay absolute inset-0 bg-black/80 opacity-0 transition-opacity p-1.5 flex flex-col justify-between text-center pointer-events-none">
+                    <span class="text-[10px] font-bold text-white truncate">${movie.title}</span>
+                    <div class="space-y-0.5">
+                        <div class="text-[#00e054] text-xs font-black flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-star text-amber-400 text-[10px]"></i> ${movie.rating}
+                        </div>
+                        <div class="text-[9px] text-gray-400"><i class="fa-solid fa-comment"></i> ${movie.reviews}</div>
+                    </div>
+                    <span class="text-[9px] bg-[#00e054] text-black font-bold px-1 py-0.5 rounded">상세보기</span>
+                </div>
+            `;
+
+            // 이벤트 바인딩
+            card.addEventListener('dragstart', handleDragStart);
+            card.addEventListener('dragend', handleDragEnd);
+            card.addEventListener('click', () => openMovieDetailModal(movie.id));
+
+            return card;
+        }
+
+        /* ================================================================= */
+        /* DRAG & DROP HANDLERS (HTML5 Drag and Drop API) */
+        /* ================================================================= */
+        let draggedMovieId = null;
+
+        function handleDragStart(e) {
+            draggedMovieId = this.getAttribute('data-id');
+            this.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', draggedMovieId);
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            draggedMovieId = null;
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const zone = e.currentTarget;
+            zone.classList.remove('drag-over');
+
+            const targetTier = zone.getAttribute('data-tier');
+            const movieId = parseInt(e.dataTransfer.getData('text/plain') || draggedMovieId);
+
+            if (movieId && targetTier) {
+                moveMovieToTier(movieId, targetTier);
+            }
+        }
+
+        /**
+         * 영화 티어 이동 로직 및 자동 저장
+         */
+        function moveMovieToTier(movieId, tier) {
+            if (!userTiers[currentUser]) {
+                userTiers[currentUser] = {};
+            }
+
+            if (tier === 'unassigned') {
+                delete userTiers[currentUser][movieId];
+            } else {
+                userTiers[currentUser][movieId] = tier;
+            }
+
+            saveData();
+            renderAllTiers();
+            
+            const movie = moviesList.find(m => m.id === movieId);
+            if (movie && tier !== 'unassigned') {
+                showToast(`'${movie.title}'을(를) ${tier} 티어로 이동했습니다.`);
+            }
+        }
+
+        /* ================================================================= */
+        /* MODAL LOGIC & COMMENT SYSTEM */
+        /* ================================================================= */
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+
+        /**
+         * 영화 상세 모달 오픈
+         */
+        function openMovieDetailModal(movieId) {
+            currentActiveMovieId = movieId;
+            const movie = moviesList.find(m => m.id === movieId);
+            if (!movie) return;
+
+            document.getElementById('modalTitle').innerText = movie.title;
+            document.getElementById('modalGenre').innerText = movie.genre;
+            document.getElementById('modalRating').innerText = movie.rating;
+            document.getElementById('modalReviews').innerText = movie.reviews.toLocaleString();
+            document.getElementById('modalSynopsis').innerText = movie.synopsis || '줄거리 정보가 없습니다.';
+
+            const posterImg = document.getElementById('modalPoster');
+            const fallbackBg = `https://placehold.co/300x450/1f2937/00e054?text=${encodeURIComponent(movie.title)}`;
+            posterImg.src = movie.poster;
+            posterImg.onerror = function() { this.src = fallbackBg; };
+
+            // 티어 변경 버튼 생성 (모바일 및 클릭 이동 용)
+            const currentTier = userTiers[currentUser]?.[movieId] || 'unassigned';
+            const tierButtonsContainer = document.getElementById('modalTierButtons');
+            tierButtonsContainer.innerHTML = '';
+
+            const tiers = [
+                { id: 'S', name: 'S Tier', color: 'bg-red-600' },
+                { id: 'A', name: 'A Tier', color: 'bg-purple-600' },
+                { id: 'B', name: 'B Tier', color: 'bg-blue-600' },
+                { id: 'C', name: 'C Tier', color: 'bg-emerald-600' },
+                { id: 'unassigned', name: '미분류', color: 'bg-gray-700' }
+            ];
+
+            tiers.forEach(t => {
+                const btn = document.createElement('button');
+                const isSelected = currentTier === t.id;
+                btn.className = `text-xs px-3 py-1.5 rounded-lg font-bold text-white transition ${t.color} ${isSelected ? 'ring-2 ring-white scale-105' : 'opacity-60 hover:opacity-100'}`;
+                btn.innerText = t.name;
+                btn.onclick = () => {
+                    moveMovieToTier(movieId, t.id);
+                    openMovieDetailModal(movieId); // UI 갱신
+                };
+                tierButtonsContainer.appendChild(btn);
+            });
+
+            // 코멘트 리스트 렌더링
+            renderComments(movieId);
+
+            openModal('movieDetailModal');
+        }
+
+        /**
+         * 코멘트 리스트 렌더링
+         */
+        function renderComments(movieId) {
+            const listEl = document.getElementById('commentsList');
+            listEl.innerHTML = '';
+
+            const comments = userComments[movieId] || [];
+            if (comments.length === 0) {
+                listEl.innerHTML = '<p class="text-xs text-gray-500 py-2">등록된 코멘트가 없습니다. 첫 코멘트를 작성해보세요!</p>';
+                return;
+            }
+
+            comments.forEach(c => {
+                const item = document.createElement('div');
+                item.className = 'bg-[#14181c] p-2.5 rounded-lg border border-[#2c3440] text-xs space-y-1';
+                item.innerHTML = `
+                    <div class="flex justify-between items-center text-gray-400">
+                        <span class="font-bold text-[#00e054]">${c.user}</span>
+                        <span class="text-[10px] text-gray-500">${c.date}</span>
+                    </div>
+                    <p class="text-gray-200">${c.text}</p>
+                `;
+                listEl.appendChild(item);
+            });
+        }
+
+        /**
+         * 코멘트 추가
+         */
+        function addComment() {
+            const input = document.getElementById('commentInput');
+            const text = input.value.trim();
+
+            if (!text) return;
+
+            if (!userComments[currentActiveMovieId]) {
+                userComments[currentActiveMovieId] = [];
+            }
+
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+            userComments[currentActiveMovieId].unshift({
+                user: currentUser,
+                text: text,
+                date: dateStr
+            });
+
+            saveData();
+            input.value = '';
+            renderComments(currentActiveMovieId);
+            showToast('코멘트가 작성되었습니다.');
+        }
+
+        /* ================================================================= */
+        /* 새 영화 추가 로직 */
+        /* ================================================================= */
+
+        function openAddMovieModal() {
+            document.getElementById('addMovieForm').reset();
+            openModal('addMovieModal');
+        }
+
+        function handleAddMovie(e) {
+            e.preventDefault();
+
+            const titleInput = document.getElementById('newTitle').value.trim();
+            const genre = document.getElementById('newGenre').value;
+            const poster = document.getElementById('newPoster').value.trim();
+            const synopsis = document.getElementById('newSynopsis').value.trim();
+
+            // 유효성 검사: 빈칸이나 공백만 넣으면 거부
+            if (!titleInput) {
+                showToast('영화 제목을 입력해주세요!', true);
+                return;
+            }
+
+            const newId = Date.now(); // 유니크 ID 생성
+            const newMovie = {
+                id: newId,
+                title: titleInput,
+                genre: genre,
+                rating: 0.0,
+                reviews: 0,
+                poster: poster || `https://placehold.co/300x450/1f2937/00e054?text=${encodeURIComponent(titleInput)}`,
+                synopsis: synopsis || '사용자가 등록한 영화입니다.'
+            };
+
+            moviesList.unshift(newMovie);
+            saveData();
+            renderAllTiers();
+
+            closeModal('addMovieModal');
+            showToast(`새 영화 '${titleInput}'이(가) 미분류 목록에 추가되었습니다.`);
+        }
+
+        /* ================================================================= */
+        /* 추천 WIZARD LOGIC */
+        /* ================================================================= */
+
+        function openRecommendationModal() {
+            document.getElementById('recommendStep1').classList.remove('hidden');
+            document.getElementById('recommendStep2').classList.add('hidden');
+            currentRecRating = 0;
+            resetStarRatingUI();
+            openModal('recommendationModal');
+        }
+
+        function selectGenre(genre) {
+            document.getElementById('recommendedGenreLabel').innerText = genre;
+
+            // 해당 장르의 영화 검색 (평점 순)
+            let matchingMovies = moviesList.filter(m => m.genre === genre);
+            if (matchingMovies.length === 0) {
+                matchingMovies = moviesList; // 매칭 없을 경우 전체 중 선택
+            }
+
+            // 랜덤 또는 제일 평점 높은 영화 추천
+            recommendedMovieTemp = matchingMovies[Math.floor(Math.random() * matchingMovies.length)];
+
+            // Step 2 UI 업데이트
+            const container = document.getElementById('recommendedMovieContainer');
+            const fallbackBg = `https://placehold.co/300x450/1f2937/00e054?text=${encodeURIComponent(recommendedMovieTemp.title)}`;
+
+            container.innerHTML = `
+                <img src="${recommendedMovieTemp.poster}" alt="Poster" class="w-28 h-40 object-cover rounded-lg border border-gray-700 shadow" onerror="this.onerror=null; this.src='${fallbackBg}';">
+                <div>
+                    <h4 class="text-white font-bold text-base">${recommendedMovieTemp.title}</h4>
+                    <p class="text-xs text-gray-400 mt-1 line-clamp-2">${recommendedMovieTemp.synopsis}</p>
+                    <div class="text-[#00e054] text-xs font-bold mt-2">평균 ★ ${recommendedMovieTemp.rating}</div>
+                </div>
+            `;
+
+            document.getElementById('recommendStep1').classList.add('hidden');
+            document.getElementById('recommendStep2').classList.remove('hidden');
+        }
+
+        function setRecRating(stars) {
+            currentRecRating = stars;
+            const starBox = document.getElementById('starRatingBox');
+            const icons = starBox.querySelectorAll('i');
+
+            icons.forEach((icon, idx) => {
+                if (idx < stars) {
+                    icon.className = 'fa-solid fa-star text-amber-400 hover:scale-110 transition';
+                } else {
+                    icon.className = 'fa-regular fa-star hover:scale-110 transition';
+                }
+            });
+        }
+
+        function resetStarRatingUI() {
+            const starBox = document.getElementById('starRatingBox');
+            const icons = starBox.querySelectorAll('i');
+            icons.forEach(icon => {
+                icon.className = 'fa-regular fa-star hover:scale-110 transition';
+            });
+        }
+
+        /**
+         * 별점에 따라 추천 영화를 자동으로 해당 티어에 분류
+         * (기획서 기준: 4.1~5.0 = S / 3.1~4.0 = A / 2.1~3.0 = B / 0~2.0 = C)
+         */
+        function applyRecommendationTier() {
+            if (!recommendedMovieTemp) return;
+
+            let calculatedTier = 'A'; // 기본값
+
+            if (currentRecRating > 0) {
+                // 사용자가 부여한 별점에 따름 (1~5점 기준)
+                if (currentRecRating >= 5) calculatedTier = 'S';
+                else if (currentRecRating === 4) calculatedTier = 'A';
+                else if (currentRecRating === 3) calculatedTier = 'B';
+                else calculatedTier = 'C';
+            } else {
+                // 평점에 기반한 자동 산정 (S: 4.1~5.0, A: 3.1~4.0, B: 2.1~3.0, C: 0~2.0)
+                const r = recommendedMovieTemp.rating;
+                if (r >= 4.1) calculatedTier = 'S';
+                else if (r >= 3.1) calculatedTier = 'A';
+                else if (r >= 2.1) calculatedTier = 'B';
+                else calculatedTier = 'C';
+            }
+
+            moveMovieToTier(recommendedMovieTemp.id, calculatedTier);
+            closeModal('recommendationModal');
+            showToast(`'${recommendedMovieTemp.title}'이(가) ${calculatedTier} 티어에 자동 등록되었습니다.`);
+        }
+
+        /* ================================================================= */
+        /* 처음으로 (초기화) 기능 */
+        /* ================================================================= */
+
+        function confirmReset() {
+            if (confirm('모든 영화 배치 및 커스텀 등록 영화가 초기화되며 미분류로 돌아갑니다. 계속하시겠습니까?')) {
+                localStorage.removeItem('cine_movies');
+                localStorage.removeItem('cine_user_tiers');
+                localStorage.removeItem('cine_comments');
+
+                moviesList = [...INITIAL_MOVIES];
+                userTiers = { 'cinema_fan': {}, 'movie_buff': {}, 'film_critic': {} };
+                userComments = {};
+
+                saveData();
+                renderAllTiers();
+                showToast('초기 상태로 리셋되었습니다.');
+            }
+        }
+
+        /* ================================================================= */
+        /* TOAST UTILITY */
+        /* ================================================================= */
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toastMessage');
+            const toastText = document.getElementById('toastText');
+
+            toastText.innerText = message;
+            toast.className = `fixed bottom-6 right-6 border text-white text-sm px-4 py-3 rounded-lg shadow-xl z-50 flex items-center space-x-2 transition ${isError ? 'bg-red-900 border-red-500' : 'bg-[#1f2937] border-[#00e054]'}`;
+
+            toast.classList.remove('hidden');
+
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

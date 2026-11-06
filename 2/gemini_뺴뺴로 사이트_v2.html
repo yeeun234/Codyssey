@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DIY 빼빼로 만들기 & 360도 편지 박스</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & React DOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel Standalone (for JSX parsing) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Google Fonts: Nanum Pen Script & Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Noto+Sans+KR:wght@400;600;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+    }
+    .font-handwriting {
+      font-family: 'Nanum Pen Script', cursive;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.3s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="bg-pink-50 text-slate-800 antialiased select-none">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // SVG Icons Components
+    const GiftIcon = () => (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+      </svg>
+    );
+
+    const HeartIcon = ({ className = "w-6 h-6" }) => (
+      <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+      </svg>
+    );
+
+    const StarIcon = ({ className = "w-6 h-6" }) => (
+      <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+      </svg>
+    );
+
+    // Color Palette
+    const CHOCO_COLORS = [
+      { id: 'brown', name: '클래식 초코', hex: '#4A2C11', accent: '#6B4226', light: '#8D5B4C' },
+      { id: 'pink', name: '딸기 초코', hex: '#FF85A1', accent: '#FF6B8B', light: '#FFB3C1' },
+      { id: 'green', name: '말차 초코', hex: '#588157', accent: '#3A5A40', light: '#A3B18A' },
+      { id: 'red', name: '레드 초코', hex: '#D90429', accent: '#EF233C', light: '#F77F00' },
+      { id: 'blue', name: '민트 블루', hex: '#4EA8DE', accent: '#56CFE1', light: '#90E0EF' }
+    ];
+
+    function App() {
+      // App Mode: 'DIY' | 'PACKAGING' | 'RECEIVER_360'
+      const [appMode, setAppMode] = useState('DIY');
+
+      // Form & Letter State
+      const [senderName, setSenderName] = useState('');
+      const [recipientName, setRecipientName] = useState('');
+      const [message, setMessage] = useState('');
+      const [toastMessage, setToastMessage] = useState('');
+      
+      // DIY State
+      const [selectedColor, setSelectedColor] = useState(CHOCO_COLORS[0]);
+      const [isCoated, setIsCoated] = useState(false);
+      const [selectedSprinkle, setSelectedSprinkle] = useState(null); // 'heart' | 'star' | null
+      const [isPenActive, setIsPenActive] = useState(false);
+      const [penColor, setPenColor] = useState('#FFFFFF');
+      
+      // Combined Chronological Layer History (Sprinkles placed after Pen strokes render on top!)
+      const [decorationsList, setDecorationsList] = useState([]);
+      const [currentPenPath, setCurrentPenPath] = useState(null);
+      const [isDrawingPen, setIsDrawingPen] = useState(false);
+
+      // Refs
+      const peperoCanvasRef = useRef(null);
+      const isDraggingSprinkleRef = useRef(false);
+
+      // Out-of-Bound Drop Particles
+      const [fallingParticles, setFallingParticles] = useState([]);
+
+      // 360 Box Viewer State
+      const [boxRotation, setBoxRotation] = useState(0);
+      const [isDraggingBox, setIsDraggingBox] = useState(false);
+      const [dragStartX, setDragStartX] = useState(0);
+      const [isBoxOpen, setIsBoxOpen] = useState(false);
+
+      // Parse URL Hash on Load for Recipient 360 Mode
+      useEffect(() => {
+        const hash = window.location.hash;
+        if (hash && hash.includes('#data=')) {
+          try {
+            const encodedData = hash.replace('#data=', '');
+            const decodedJson = decodeURIComponent(atob(encodedData));
+            const payload = JSON.parse(decodedJson);
+
+            if (payload) {
+              if (payload.color) setSelectedColor(payload.color);
+              if (payload.decorations) {
+                setDecorationsList(payload.decorations);
+              } else {
+                // Backward compatibility
+                const legacyDecorations = [];
+                if (payload.sprinkles) {
+                  payload.sprinkles.forEach(s => legacyDecorations.push({ itemType: 'sprinkle', data: s }));
+                }
+                if (payload.paths) {
+                  payload.paths.forEach(p => legacyDecorations.push({ itemType: 'penPath', data: p }));
+                }
+                setDecorationsList(legacyDecorations);
+              }
+              if (payload.sender) setSenderName(payload.sender);
+              if (payload.recipient) setRecipientName(payload.recipient);
+              if (payload.message) setMessage(payload.message);
+              setIsCoated(true);
+              setAppMode('RECEIVER_360');
+            }
+          } catch (err) {
+            console.error("Failed to parse shared Pepero URL hash data", err);
+          }
+        }
+      }, []);
+
+      const showToast = (msg) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(''), 3000);
+      };
+
+      // Gravity Loop for Falling Drops/Sprinkles Outside Stick
+      useEffect(() => {
+        if (fallingParticles.length === 0) return;
+
+        const timer = setInterval(() => {
+          setFallingParticles(prev => {
+            return prev
+              .map(p => ({
+                ...p,
+                x: p.x + p.vx,
+                y: p.y + p.vy,
+                vy: p.vy + 0.5,
+                opacity: p.opacity - 0.025
+              }))
+              .filter(p => p.y < 390 && p.opacity > 0);
+          });
+        }, 16);
+
+        return () => clearInterval(timer);
+      }, [fallingParticles]);
+
+      const spawnFallingParticle = (coords, color, type = 'drip') => {
+        const newParticle = {
+          id: Date.now() + Math.random(),
+          x: coords.x,
+          y: coords.y,
+          vx: (Math.random() - 0.5) * 2,
+          vy: Math.random() * 2 + 1,
+          size: type === 'drip' ? Math.random() * 5 + 4 : Math.random() * 4 + 6,
+          color: color,
+          type: type,
+          opacity: 1
+        };
+        setFallingParticles(prev => [...prev.slice(-30), newParticle]);
+      };
+
+      // Helper Renderer Functions
+      const renderSprinkle = (ctx, sp) => {
+        ctx.save();
+        ctx.translate(sp.x, sp.y);
+        ctx.rotate((sp.rotation * Math.PI) / 180);
+
+        ctx.fillStyle = sp.color;
+        ctx.shadowColor = 'rgba(0,0,0,0.15)';
+        ctx.shadowBlur = 3;
+        ctx.shadowOffsetY = 2;
+
+        if (sp.type === 'heart') {
+          const s = sp.size / 12;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.bezierCurveTo(-6 * s, -6 * s, -12 * s, 2 * s, 0, 10 * s);
+          ctx.bezierCurveTo(12 * s, 2 * s, 6 * s, -6 * s, 0, 0);
+          ctx.fill();
+        } else if (sp.type === 'star') {
+          const r = sp.size;
+          ctx.beginPath();
+          for (let i = 0; i < 5; i++) {
+            ctx.lineTo(Math.cos((18 + i * 72) * Math.PI / 180) * r, -Math.sin((18 + i * 72) * Math.PI / 180) * r);
+            ctx.lineTo(Math.cos((54 + i * 72) * Math.PI / 180) * (r / 2), -Math.sin((54 + i * 72) * Math.PI / 180) * (r / 2));
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        ctx.restore();
+      };
+
+      const renderPenPath = (ctx, path) => {
+        if (!path.points || path.points.length < 2) return;
+
+        // Shadow Layer
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.lineWidth = 7;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(path.points[0].x + 1.5, path.points[0].y + 2.5);
+        for (let i = 1; i < path.points.length; i++) {
+          ctx.lineTo(path.points[i].x + 1.5, path.points[i].y + 2.5);
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // Base Pen Color
+        ctx.save();
+        ctx.strokeStyle = path.color;
+        ctx.lineWidth = 5.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(path.points[0].x, path.points[0].y);
+        for (let i = 1; i < path.points.length; i++) {
+          ctx.lineTo(path.points[i].x, path.points[i].y);
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // Top Highlight Layer
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(path.points[0].x - 1, path.points[0].y - 1);
+        for (let i = 1; i < path.points.length; i++) {
+          ctx.lineTo(path.points[i].x - 1, path.points[i].y - 1);
+        }
+        ctx.stroke();
+        ctx.restore();
+      };
+
+      // Main Canvas Render Logic
+      const redrawPeperoCanvas = () => {
+        const canvas = peperoCanvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        ctx.clearRect(0, 0, width, height);
+
+        // Draw Stick Body
+        const stickW = 32;
+        const stickH = 340;
+        const stickX = (width - stickW) / 2;
+        const stickY = 40;
+        const radius = 10;
+
+        const biscuitGrad = ctx.createLinearGradient(stickX, stickY, stickX + stickW, stickY);
+        biscuitGrad.addColorStop(0, '#E6B06C');
+        biscuitGrad.addColorStop(0.5, '#F5C98B');
+        biscuitGrad.addColorStop(1, '#D49B53');
+
+        ctx.fillStyle = biscuitGrad;
+        ctx.beginPath();
+        ctx.roundRect(stickX, stickY, stickW, stickH, [radius, radius, 8, 8]);
+        ctx.fill();
+
+        ctx.strokeStyle = '#C38538';
+        ctx.lineWidth = 1.5;
+        for (let y = stickY + 30; y < stickY + stickH - 20; y += 35) {
+          ctx.beginPath();
+          ctx.moveTo(stickX + 6, y);
+          ctx.lineTo(stickX + stickW - 6, y + 2);
+          ctx.stroke();
+        }
+
+        // Draw Chocolate Coating
+        const coatedH = 260;
+        if (isCoated) {
+          const coatGrad = ctx.createLinearGradient(stickX, stickY, stickX + stickW, stickY);
+          coatGrad.addColorStop(0, selectedColor.accent);
+          coatGrad.addColorStop(0.3, selectedColor.hex);
+          coatGrad.addColorStop(0.8, selectedColor.hex);
+          coatGrad.addColorStop(1, selectedColor.light);
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(stickX - 2, stickY - 2, stickW + 4, coatedH, [radius, radius, 0, 0]);
+          ctx.clip();
+
+          ctx.fillStyle = coatGrad;
+          ctx.fillRect(stickX - 2, stickY - 2, stickW + 4, coatedH);
+
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+          ctx.fillRect(stickX + 4, stickY, 5, coatedH - 10);
+
+          ctx.fillStyle = selectedColor.hex;
+          ctx.beginPath();
+          ctx.arc(stickX + 8, stickY + coatedH, 7, 0, Math.PI);
+          ctx.arc(stickX + 18, stickY + coatedH + 3, 6, 0, Math.PI);
+          ctx.arc(stickX + 26, stickY + coatedH - 2, 5, 0, Math.PI);
+          ctx.fill();
+
+          ctx.restore();
+        }
+
+        // Render Decorations sequentially (Chronological layering)
+        decorationsList.forEach(item => {
+          if (item.itemType === 'sprinkle') {
+            renderSprinkle(ctx, item.data);
+          } else if (item.itemType === 'penPath') {
+            renderPenPath(ctx, item.data);
+          }
+        });
+
+        // Active drawing path
+        if (currentPenPath) {
+          renderPenPath(ctx, currentPenPath);
+        }
+
+        // Render Out-of-Bound Falling Droplets
+        fallingParticles.forEach(fp => {
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, fp.opacity);
+          ctx.fillStyle = fp.color;
+
+          if (fp.type === 'drip') {
+            ctx.beginPath();
+            ctx.arc(fp.x, fp.y, fp.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.beginPath();
+            ctx.arc(fp.x - fp.size * 0.3, fp.y - fp.size * 0.3, fp.size * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.translate(fp.x, fp.y);
+            ctx.rotate((fp.y * 3 * Math.PI) / 180);
+            if (fp.type === 'heart') {
+              const s = fp.size / 10;
+              ctx.beginPath();
+              ctx.moveTo(0, 0);
+              ctx.bezierCurveTo(-6 * s, -6 * s, -12 * s, 2 * s, 0, 10 * s);
+              ctx.bezierCurveTo(12 * s, 2 * s, 6 * s, -6 * s, 0, 0);
+              ctx.fill();
+            } else {
+              const r = fp.size;
+              ctx.beginPath();
+              for (let i = 0; i < 5; i++) {
+                ctx.lineTo(Math.cos((18 + i * 72) * Math.PI / 180) * r, -Math.sin((18 + i * 72) * Math.PI / 180) * r);
+                ctx.lineTo(Math.cos((54 + i * 72) * Math.PI / 180) * (r / 2), -Math.sin((54 + i * 72) * Math.PI / 180) * (r / 2));
+              }
+              ctx.fill();
+            }
+          }
+
+          ctx.restore();
+        });
+      };
+
+      useEffect(() => {
+        redrawPeperoCanvas();
+      }, [selectedColor, isCoated, decorationsList, currentPenPath, fallingParticles, appMode, isBoxOpen]);
+
+      const getCanvasCoords = (e) => {
+        const canvas = peperoCanvasRef.current;
+        if (!canvas) return { x: 0, y: 0 };
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+          x: (clientX - rect.left) * (canvas.width / rect.width),
+          y: (clientY - rect.top) * (canvas.height / rect.height)
+        };
+      };
+
+      const handleSprinkleScatter = (coords) => {
+        if (!isCoated) return;
+        if (coords.x >= 70 && coords.x <= 130 && coords.y >= 40 && coords.y <= 300) {
+          const colors = selectedSprinkle === 'heart' 
+            ? ['#FF4D6D', '#FFB3C1', '#FFF0F5', '#FF758F'] 
+            : ['#FFD166', '#FFB703', '#FFF3B0', '#FAEDCD'];
+          
+          const newSprinkle = {
+            id: Date.now() + Math.random(),
+            type: selectedSprinkle,
+            x: coords.x + (Math.random() * 12 - 6),
+            y: coords.y + (Math.random() * 12 - 6),
+            size: Math.random() * 4 + 7,
+            rotation: Math.random() * 360,
+            color: colors[Math.floor(Math.random() * colors.length)]
+          };
+
+          setDecorationsList(prev => [...prev, { itemType: 'sprinkle', data: newSprinkle }]);
+        } else {
+          const colors = selectedSprinkle === 'heart' ? '#FF4D6D' : '#FFD166';
+          spawnFallingParticle(coords, colors, selectedSprinkle);
+        }
+      };
+
+      const handlePointerDown = (e) => {
+        const coords = getCanvasCoords(e);
+        const isOnStick = coords.x >= 70 && coords.x <= 130 && coords.y >= 40 && coords.y <= 300;
+
+        if (isPenActive && isCoated) {
+          setIsDrawingPen(true);
+          if (isOnStick) {
+            setCurrentPenPath({ color: penColor, points: [coords] });
+          } else {
+            spawnFallingParticle(coords, penColor, 'drip');
+          }
+          return;
+        }
+
+        if (selectedSprinkle && isCoated) {
+          isDraggingSprinkleRef.current = true;
+          handleSprinkleScatter(coords);
+        }
+      };
+
+      const handlePointerMove = (e) => {
+        const coords = getCanvasCoords(e);
+        const isOnStick = coords.x >= 70 && coords.x <= 130 && coords.y >= 40 && coords.y <= 300;
+
+        if (isPenActive && isDrawingPen) {
+          if (isOnStick) {
+            setCurrentPenPath(prev => {
+              if (!prev) return { color: penColor, points: [coords] };
+              return { ...prev, points: [...prev.points, coords] };
+            });
+          } else {
+            spawnFallingParticle(coords, penColor, 'drip');
+          }
+        }
+
+        if (selectedSprinkle && isDraggingSprinkleRef.current) {
+          handleSprinkleScatter(coords);
+        }
+      };
+
+      const handlePointerUp = () => {
+        if (isPenActive && isDrawingPen && currentPenPath) {
+          setDecorationsList(prev => [...prev, { itemType: 'penPath', data: currentPenPath }]);
+          setCurrentPenPath(null);
+        }
+        setIsDrawingPen(false);
+        isDraggingSprinkleRef.current = false;
+      };
+
+      const handleDropOnBowl = (e) => {
+        e.preventDefault();
+        setIsCoated(true);
+        showToast(`${selectedColor.name} 초콜릿 코팅 완료! 🎉`);
+      };
+
+      const handleBoxPointerDown = (e) => {
+        setIsDraggingBox(true);
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        setDragStartX(clientX);
+      };
+
+      const handleBoxPointerMove = (e) => {
+        if (!isDraggingBox) return;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const deltaX = clientX - dragStartX;
+        setBoxRotation(prev => (prev + deltaX * 0.8) % 360);
+        setDragStartX(clientX);
+      };
+
+      const handleBoxPointerUp = () => setIsDraggingBox(false);
+
+      const generateShareLink = async () => {
+        const payload = {
+          color: selectedColor,
+          decorations: decorationsList,
+          sender: senderName,
+          recipient: recipientName,
+          message: message
+        };
+
+        const jsonStr = JSON.stringify(payload);
+        const encoded = btoa(encodeURIComponent(jsonStr));
+        const url = `${window.location.origin}${window.location.pathname}#data=${encoded}`;
+
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(url);
+            showToast('360° 선물 URL이 클립보드에 복사되었습니다! 💌');
+          } else {
+            throw new Error('Clipboard API unavailable');
+          }
+        } catch (err) {
+          try {
+            const textArea = document.createElement('textarea');
+            textArea.value = url;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            if (successful) {
+              showToast('360° 선물 URL이 복사되었습니다! 💌');
+            } else {
+              prompt('아래 링크를 복사해주세요:', url);
+            }
+          } catch (fallbackErr) {
+            prompt('아래 링크를 복사해주세요:', url);
+          }
+        }
+      };
+
+      const downloadPeperoImage = () => {
+        const canvas = peperoCanvasRef.current;
+        if (!canvas) return;
+        const link = document.createElement('a');
+        link.download = `Pepero_${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        showToast('커스텀 빼빼로 이미지가 저장되었습니다! 🖼️');
+      };
+
+      const downloadBoxImage = () => {
+        const boxCanvas = document.createElement('canvas');
+        boxCanvas.width = 600;
+        boxCanvas.height = 700;
+        const ctx = boxCanvas.getContext('2d');
+
+        ctx.fillStyle = '#FFF5F5';
+        ctx.fillRect(0, 0, 600, 700);
+
+        ctx.fillStyle = '#E63946';
+        ctx.beginPath();
+        ctx.roundRect(100, 80, 400, 540, 20);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(270, 80, 60, 540);
+        ctx.fillRect(100, 310, 400, 60);
+
+        ctx.fillStyle = '#FFD166';
+        ctx.beginPath();
+        ctx.arc(300, 340, 45, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.font = '28px "Nanum Pen Script", cursive';
+        ctx.fillStyle = '#1D3557';
+        ctx.textAlign = 'center';
+        
+        const lines = (message || "편지 내용이 없습니다.").split('\n');
+        lines.forEach((line, idx) => {
+          ctx.fillText(line, 300, 460 + (idx * 35));
+        });
+
+        if (recipientName) {
+          ctx.font = 'bold 24px "Noto Sans KR", sans-serif';
+          ctx.fillText(`To. ${recipientName}`, 300, 150);
+        }
+        if (senderName) {
+          ctx.font = '20px "Noto Sans KR", sans-serif';
+          ctx.fillText(`From. ${senderName}`, 300, 580);
+        }
+
+        const link = document.createElement('a');
+        link.download = `Pepero_GiftBox_${Date.now()}.png`;
+        link.href = boxCanvas.toDataURL('image/png');
+        link.click();
+        showToast('선물 상자 이미지가 저장되었습니다! 🎁');
+      };
+
+      return (
+        <div className="min-h-screen bg-pink-50 text-slate-800 flex flex-col justify-between">
+          
+          {/* Toast Notification */}
+          {toastMessage && (
+            <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center space-x-2 animate-bounce">
+              <span>✨</span>
+              <span className="font-semibold text-sm">{toastMessage}</span>
+            </div>
+          )}
+
+          {/* Header */}
+          <header className="w-full bg-white/80 backdrop-blur-md border-b border-pink-100 py-3 px-6 flex items-center justify-between shadow-sm">
+            <div className="flex items-center space-x-3">
+              <div className="bg-red-500 text-white p-2 rounded-xl shadow-md">
+                <GiftIcon />
+              </div>
+              <div>
+                <h1 className="text-xl font-black tracking-tight text-red-600">DIY 빼빼로 스튜디오</h1>
+                <p className="text-xs text-slate-500 font-medium">360° 인터랙티브 손글씨 기프트 박스</p>
+              </div>
+            </div>
+
+            {appMode !== 'RECEIVER_360' && (
+              <div className="flex items-center space-x-3">
+                {appMode === 'DIY' ? (
+                  <button
+                    onClick={() => setAppMode('PACKAGING')}
+                    className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-full font-bold shadow-lg shadow-red-200 transition flex items-center space-x-2 text-sm"
+                  >
+                    <span>완성하기 & 포장 🎁</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setAppMode('DIY')}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-full font-bold transition flex items-center space-x-2 text-sm"
+                  >
+                    <span>← 빼빼로 수정하기</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </header>
+
+          {/* Main Content */}
+          <main className="w-full max-w-6xl mx-auto flex-1 p-4 md:p-6 flex flex-col justify-center">
+
+            {/* MODE 1: DIY 4-QUARTER KITCHEN STUDIO */}
+            {appMode === 'DIY' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+                
+                {/* 1. Chocolate Melting Bowl */}
+                <div 
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDropOnBowl}
+                  className="bg-amber-900/10 border-2 border-dashed border-amber-300 rounded-3xl p-6 flex flex-col items-center justify-center relative shadow-inner min-h-[300px] bg-gradient-to-br from-amber-50 to-orange-100"
+                >
+                  <span className="absolute top-4 left-4 bg-amber-800 text-amber-50 px-3 py-1 rounded-full text-xs font-bold tracking-wide">
+                    1. 중탕 초콜릿 그릇
+                  </span>
+
+                  <div 
+                    onClick={() => { setIsCoated(true); showToast(`${selectedColor.name} 초콜릿 코팅 완료!`); }}
+                    className="w-48 h-48 rounded-full border-8 border-amber-900 shadow-2xl flex items-center justify-center relative cursor-pointer transform hover:scale-105 transition group"
+                    style={{ backgroundColor: selectedColor.hex }}
+                  >
+                    <div className="w-36 h-36 rounded-full border-4 border-white/20 bg-gradient-to-tl from-transparent to-white/30 flex items-center justify-center">
+                      <div className="text-white text-center opacity-80 group-hover:opacity-100 transition">
+                        <p className="font-bold text-sm">{selectedColor.name}</p>
+                        <p className="text-[11px] underline mt-1">클릭/스틱을 드래그하여 코팅</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Sprinkle Selection Bowl */}
+                <div className="bg-gradient-to-br from-pink-100 to-rose-50 border-2 border-pink-200 rounded-3xl p-6 flex flex-col items-center justify-center relative shadow-sm min-h-[300px]">
+                  <span className="absolute top-4 left-4 bg-pink-600 text-white px-3 py-1 rounded-full text-xs font-bold tracking-wide">
+                    3. 스프링클 흩뿌리기
+                  </span>
+
+                  <p className="text-xs text-slate-600 mb-4 text-center font-medium">
+                    원하는 모양 선택 후 우측 하단 <br/>
+                    <span className="font-bold text-pink-600">빼빼로 스틱 위로 문질러</span> 뿌려주세요!
+                  </p>
+
+                  <div className="flex space-x-6">
+                    <button
+                      onClick={() => {
+                        setSelectedSprinkle(selectedSprinkle === 'heart' ? null : 'heart');
+                        setIsPenActive(false);
+                      }}
+                      className={`flex flex-col items-center p-4 rounded-2xl border-2 transition ${
+                        selectedSprinkle === 'heart' 
+                          ? 'border-pink-500 bg-pink-200 shadow-md scale-105' 
+                          : 'border-pink-100 bg-white hover:border-pink-300'
+                      }`}
+                    >
+                      <HeartIcon className="w-10 h-10 text-pink-500" />
+                      <span className="text-xs font-bold mt-2 text-pink-700">하트 스프링클</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setSelectedSprinkle(selectedSprinkle === 'star' ? null : 'star');
+                        setIsPenActive(false);
+                      }}
+                      className={`flex flex-col items-center p-4 rounded-2xl border-2 transition ${
+                        selectedSprinkle === 'star' 
+                          ? 'border-amber-400 bg-amber-100 shadow-md scale-105' 
+                          : 'border-pink-100 bg-white hover:border-amber-200'
+                      }`}
+                    >
+                      <StarIcon className="w-10 h-10 text-amber-400" />
+                      <span className="text-xs font-bold mt-2 text-amber-700">별 스프링클</span>
+                    </button>
+                  </div>
+
+                  {selectedSprinkle && (
+                    <div className="mt-4 bg-white/80 px-4 py-1.5 rounded-full text-xs font-bold text-slate-600 border border-pink-200 animate-pulse">
+                      ✨ {selectedSprinkle === 'heart' ? '하트' : '별'} 스프링클 모드 활성화 중!
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Palette & Choco Pen Controls */}
+                <div className="bg-white border-2 border-slate-100 rounded-3xl p-6 flex flex-col justify-between shadow-sm min-h-[300px]">
+                  <div>
+                    <span className="bg-slate-800 text-white px-3 py-1 rounded-full text-xs font-bold tracking-wide">
+                      2. 초콜릿 팔레트 & 초코펜
+                    </span>
+
+                    <div className="mt-4">
+                      <label className="text-xs font-bold text-slate-500 block mb-2">중탕 초콜릿 색상 선택</label>
+                      <div className="flex items-center space-x-3">
+                        {CHOCO_COLORS.map(c => (
+                          <button
+                            key={c.id}
+                            onClick={() => setSelectedColor(c)}
+                            className={`w-10 h-10 rounded-full flex items-center justify-center transition border-2 ${
+                              selectedColor.id === c.id ? 'scale-110 border-slate-900 shadow-md' : 'border-transparent hover:scale-105'
+                            }`}
+                            style={{ backgroundColor: c.hex }}
+                            title={c.name}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <button
+                        onClick={() => {
+                          setIsPenActive(!isPenActive);
+                          if (!isPenActive) setSelectedSprinkle(null);
+                        }}
+                        className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-sm transition ${
+                          isPenActive 
+                            ? 'bg-purple-600 text-white shadow-md' 
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        <span>✏️ 초코펜 {isPenActive ? '켜짐' : '끄기'}</span>
+                      </button>
+
+                      {isPenActive && (
+                        <div className="flex items-center space-x-2">
+                          {['#FFFFFF', '#4A2C11', '#FF4D6D', '#FFD166'].map(col => (
+                            <button
+                              key={col}
+                              onClick={() => setPenColor(col)}
+                              className={`w-7 h-7 rounded-full border-2 ${
+                                penColor === col ? 'border-purple-600 scale-110' : 'border-slate-200'
+                              }`}
+                              style={{ backgroundColor: col }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>3D 볼륨감 초코펜으로 글씨나 그림을 그려보세요!</span>
+                      <button
+                        onClick={() => {
+                          setDecorationsList([]);
+                          setCurrentPenPath(null);
+                          setIsCoated(false);
+                          showToast('초기화 되었습니다.');
+                        }}
+                        className="text-red-400 hover:text-red-600 underline font-medium"
+                      >
+                        초기화
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Canvas Pepero Stick */}
+                <div className="bg-amber-50/50 border-2 border-amber-200/60 rounded-3xl p-6 flex flex-col items-center justify-center relative shadow-sm min-h-[360px]">
+                  <span className="absolute top-4 left-4 bg-amber-700 text-white px-3 py-1 rounded-full text-xs font-bold tracking-wide">
+                    4. 빼빼로 작업대
+                  </span>
+
+                  <div 
+                    draggable={!isCoated}
+                    onDragStart={(e) => e.dataTransfer.setData('text/plain', 'stick')}
+                    className="relative cursor-crosshair touch-none flex items-center justify-center"
+                  >
+                    <canvas
+                      ref={peperoCanvasRef}
+                      width={200}
+                      height={380}
+                      onMouseDown={handlePointerDown}
+                      onMouseMove={handlePointerMove}
+                      onMouseUp={handlePointerUp}
+                      onTouchStart={handlePointerDown}
+                      onTouchMove={handlePointerMove}
+                      onTouchEnd={handlePointerUp}
+                      className="drop-shadow-xl"
+                    />
+
+                    {!isCoated && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span className="bg-black/60 text-white px-3 py-1.5 rounded-full text-xs font-medium animate-pulse">
+                          스틱을 1번 그릇으로 드래그
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* MODE 2: PACKAGING & HANDWRITING CARD */}
+            {appMode === 'PACKAGING' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center bg-white rounded-3xl p-6 md:p-10 shadow-xl border border-pink-100">
+                
+                <div className="space-y-5">
+                  <h2 className="text-2xl font-black text-slate-800">선물 상자 손글씨 메세지</h2>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">받는 사람 (To)</label>
+                      <input
+                        type="text"
+                        value={recipientName}
+                        onChange={(e) => setRecipientName(e.target.value)}
+                        placeholder="예: 지은이"
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-red-400 font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">보내는 사람 (From)</label>
+                      <input
+                        type="text"
+                        value={senderName}
+                        onChange={(e) => setSenderName(e.target.value)}
+                        placeholder="예: 민수"
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-red-400 font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 block mb-1">손글씨 메세지 입력</label>
+                    <textarea
+                      rows={4}
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="따뜻한 마음을 담은 편지를 적어보세요..."
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-red-400 font-medium"
+                    />
+                  </div>
+
+                  <div className="pt-4 flex flex-col space-y-3">
+                    <button
+                      onClick={generateShareLink}
+                      className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-100 transition flex items-center justify-center space-x-2"
+                    >
+                      <span>360° 선물 공유 링크 복사 💌</span>
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={downloadBoxImage}
+                        className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition text-sm"
+                      >
+                        박스 이미지 저장
+                      </button>
+                      <button
+                        onClick={downloadPeperoImage}
+                        className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition text-sm"
+                      >
+                        빼빼로 이미지 저장
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Box Outer Preview */}
+                <div className="flex flex-col items-center justify-center bg-pink-50/60 rounded-2xl p-8 border border-pink-100 relative">
+                  <span className="text-xs font-bold text-slate-400 mb-4">선물 박스 겉면 실시간 프리뷰</span>
+                  
+                  <div className="w-64 h-80 bg-red-600 rounded-2xl shadow-2xl relative p-5 flex flex-col justify-between border-4 border-red-700">
+                    <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-12 bg-white/90 shadow-md" />
+                    <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-12 bg-white/90 shadow-md" />
+                    
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-amber-400 rounded-full shadow-lg border-2 border-white flex items-center justify-center z-10">
+                      <HeartIcon className="w-7 h-7 text-red-600" />
+                    </div>
+
+                    <div className="z-10 text-center">
+                      {recipientName && (
+                        <span className="bg-white/90 px-3 py-1 rounded-full text-xs font-bold text-slate-800 shadow">
+                          To. {recipientName}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="z-10 bg-white/95 p-3 rounded-xl shadow-lg border border-pink-200 min-h-[110px] flex items-center justify-center text-center">
+                      <p className="text-slate-800 leading-snug break-words font-handwriting text-2xl">
+                        {message || "편지 내용이 여기에 들어갑니다."}
+                      </p>
+                    </div>
+
+                    <div className="z-10 text-center">
+                      {senderName && (
+                        <span className="bg-white/90 px-3 py-1 rounded-full text-xs font-bold text-slate-800 shadow">
+                          From. {senderName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* MODE 3: 360 DEGREE RECIPIENT VIEWER */}
+            {appMode === 'RECEIVER_360' && (
+              <div className="flex flex-col items-center justify-center min-h-[500px]">
+                
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-black text-slate-800">
+                    {senderName ? `${senderName}님이 보낸 특별한 빼빼로 선물 🎁` : '특별한 빼빼로 선물 도착! 🎁'}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">
+                    상자를 마우스/터치로 좌우로 드래그하여 360도 관람해보세요!
+                  </p>
+                </div>
+
+                <div className="relative w-80 h-96 flex items-center justify-center">
+                  <div
+                    onMouseDown={handleBoxPointerDown}
+                    onMouseMove={handleBoxPointerMove}
+                    onMouseUp={handleBoxPointerUp}
+                    onTouchStart={handleBoxPointerDown}
+                    onTouchMove={handleBoxPointerMove}
+                    onTouchEnd={handleBoxPointerUp}
+                    onClick={() => setIsBoxOpen(true)}
+                    className="w-72 h-96 relative cursor-grab active:cursor-grabbing transition-transform duration-100 ease-out"
+                    style={{
+                      transformStyle: 'preserve-3d',
+                      transform: `rotateY(${boxRotation}deg)`
+                    }}
+                  >
+                    {!isBoxOpen ? (
+                      <div className="w-full h-full bg-gradient-to-b from-red-500 to-red-600 rounded-3xl shadow-2xl p-6 flex flex-col justify-between border-4 border-red-700 relative overflow-hidden">
+                        <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-14 bg-white/90 shadow-md" />
+                        <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-14 bg-white/90 shadow-md" />
+                        
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-amber-400 rounded-full shadow-xl border-4 border-white flex items-center justify-center z-10 animate-pulse">
+                          <GiftIcon />
+                        </div>
+
+                        <div className="z-10 text-center">
+                          <span className="bg-white/90 px-4 py-1.5 rounded-full text-sm font-bold text-slate-800 shadow-md">
+                            To. {recipientName || '당신을 위한 선물'}
+                          </span>
+                        </div>
+
+                        <div className="z-10 bg-white/95 p-4 rounded-2xl shadow-xl border border-pink-200 min-h-[120px] flex items-center justify-center text-center">
+                          <p className="text-slate-800 leading-snug font-handwriting text-3xl">
+                            {message || "손글씨 편지가 담겨 있습니다."}
+                          </p>
+                        </div>
+
+                        <div className="z-10 text-center">
+                          <span className="bg-white/90 px-4 py-1.5 rounded-full text-sm font-bold text-slate-800 shadow-md">
+                            From. {senderName || '익명의 천사'}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full h-full bg-amber-100/90 rounded-3xl shadow-2xl p-6 flex flex-col items-center justify-center border-4 border-amber-300 relative animate-fadeIn">
+                        <span className="absolute top-4 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                          내 커스텀 빼빼로
+                        </span>
+
+                        <div className="mt-4">
+                          <canvas
+                            ref={peperoCanvasRef}
+                            width={200}
+                            height={380}
+                            className="drop-shadow-2xl scale-90"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-8 flex items-center space-x-4">
+                  {!isBoxOpen ? (
+                    <button
+                      onClick={() => setIsBoxOpen(true)}
+                      className="bg-red-500 hover:bg-red-600 text-white font-black px-8 py-3.5 rounded-full shadow-xl shadow-red-200 transition transform hover:scale-105"
+                    >
+                      상자 열어보기! 🎉
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setIsBoxOpen(false)}
+                      className="bg-slate-700 hover:bg-slate-800 text-white font-bold px-6 py-3 rounded-full shadow-lg transition text-sm"
+                    >
+                      상자 다시 닫기 🔒
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      window.location.hash = '';
+                      setAppMode('DIY');
+                      setIsBoxOpen(false);
+                    }}
+                    className="bg-white hover:bg-slate-50 text-slate-700 font-bold px-5 py-3 rounded-full border border-slate-200 transition text-sm"
+                  >
+                    나도 만들기 ✨
+                  </button>
+                </div>
+
+              </div>
+            )}
+
+          </main>
+
+          <footer className="w-full text-center py-4 text-xs text-slate-400 border-t border-pink-100 bg-white/50">
+            DIY Pepero & 360° Interactive Gift Box App • Single File Static HTML App
+          </footer>
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

@@ -9,7 +9,7 @@
 | 구분 | 내용 | 링크 | 비고 |
 | :--- | :--- | :--- | :--- |
 | **📋 기획서 수정** | AI 질의응답 기반 `기획서.md` 최종 확정 세션 | [Gemini 기획서 대화 바로가기](https://share.gemini.google/CappdCWmwCpi) | 요구사항 정의 및 완성 기준 수립 |
-| **✨ 사이트 제작 (선택됨)** | **Gemini** 기반 웹사이트 구현 및 버그픽스 세션 | [Gemini 개발 & 버그픽스 대화 바로가기](https://share.gemini.google/0QGCRNddyACi) | **최종 채택** (기능 구현 및 오류 수정 과정 포함) |
+| **✨ 사이트 제작 (선택됨)** | **Gemini** 기반 웹사이트 구현 및 버그픽스 세션 | [Gemini 개발 & 버그픽스 대화 바로가기](https://share.gemini.google/lXD8X1tbBecK) | **최종 채택** (기능 구현 및 오류 수정 과정 포함) |
 | **🔍 비교 세션** | **ChatGPT** 기반 웹사이트 구현 세션 | [ChatGPT 개발 대화 바로가기](https://chatgpt.com/share/6aedc701-06dc-83ee-ae34-2410a2f76ec1) | 모델 간 결과물 비교 및 검토용 |
 
 ---
